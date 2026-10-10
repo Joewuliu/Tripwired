@@ -282,6 +282,15 @@ containers, and the VM itself.
 sudo bash deploy/egress-firewall.sh
 ```
 
+Before it adds any rule, the script makes sure the kernel really sends traffic between containers
+through iptables: it loads the `br_netfilter` module, sets `net.bridge.bridge-nf-call-iptables=1`,
+and writes the two files that do the same at boot (`/etc/modules-load.d/br_netfilter.conf` and
+`/etc/sysctl.d/99-tripwire-egress.conf`). This matters: on a VM where that module is not loaded,
+traffic between containers on the same network skips the firewall entirely, so the analyzer could
+reach the gateway and Caddy even with every rule installed (the rules for the internet and the VM
+still work, which hides the problem). If the script cannot get the setting to `1` it stops with an
+error and installs nothing. If you already set these by hand, it finds them in place.
+
 It prints the rules it added and is safe to run again. The rules are lost on reboot, so keep them
 with a systemd unit that re-applies them whenever Docker starts (step 0d removed any older unit
 with this name, so this creates a fresh one):
@@ -335,6 +344,18 @@ docker compose exec analyzer python -c "import urllib.request; urllib.request.ur
 
 Expected: a timeout error. If it prints page content, the firewall is not working.
 
+**Bridge filtering must be on** (the precondition for the next check):
+
+```bash
+cat /proc/sys/net/bridge/bridge-nf-call-iptables
+lsmod | grep br_netfilter
+cat /etc/modules-load.d/br_netfilter.conf
+```
+
+Expected: `1`, a `br_netfilter` line, and `br_netfilter`. If the first command says
+`No such file or directory`, the module is not loaded: run `sudo bash deploy/egress-firewall.sh`
+again and read what it prints.
+
 **The VM itself and the other containers must be unreachable from the analyzer:**
 
 ```bash
@@ -342,7 +363,10 @@ docker compose exec analyzer python -c "import urllib.request; urllib.request.ur
 docker compose exec analyzer python -c "import socket; socket.create_connection(('$(hostname -I | awk '{print $1}')', 22), timeout=5)"
 ```
 
-Expected: a timeout error each time.
+Expected: a timeout error each time. If the first one (Caddy, another container on the same
+network) answers, bridge filtering is off even though the rules look installed; go back to the
+previous check. After a reboot, run the bridge-filtering check and this one again once: the module,
+the sysctl and the rules must all have come back by themselves.
 
 **Normal internet access must still work:**
 
@@ -411,6 +435,9 @@ reason is recorded.
 - **The browser runs without Chromium's own sandbox** (Playwright's default in containers). The
   containment is the container itself, the unprivileged user, dropped capabilities, the 3 GB limit
   and the egress firewall, so do not skip step 7.
+- **Traffic between containers is only filtered when `br_netfilter` is loaded.** Docker normally
+  loads it, but some VM images do not. The firewall script handles it and refuses to continue if
+  it cannot.
 - **DNS is set to 1.1.1.1 and 8.8.8.8** because Google Cloud's default resolver is the metadata
   address, which the firewall blocks.
 - **Screenshots pile up** in `./data`. Clear old ones with
