@@ -139,6 +139,12 @@ async def _refresh_openphish(path: Path, timeout: float, force: bool = False) ->
             raise
 
 
+async def refresh_openphish(timeout: float = SOURCE_TIMEOUT_S) -> None:
+    """Fetch the OpenPhish list now, ignoring the hour-old cache (a live check wants today's links).
+    Raises if there is no download and no saved copy."""
+    await _refresh_openphish(OPENPHISH_PATH, timeout, force=True)
+
+
 async def _openphish(urls: list[str], timeout: float) -> list[dict]:
     await _refresh_openphish(OPENPHISH_PATH, timeout)
     listed_urls, listed_domains, listed_hosts = await asyncio.to_thread(_read_openphish, OPENPHISH_PATH)

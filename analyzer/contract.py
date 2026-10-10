@@ -10,8 +10,9 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-# "unscored" exists only until the scoring step lands: the page was opened, nothing was judged.
-Verdict = Literal["dangerous", "suspicious", "no_red_flags", "couldnt_check", "unscored"]
+# There is no "safe": the clean verdict is "no red flags found". "couldnt_check" is for a page the
+# sandbox could not inspect (it refused us, showed a human-check wall, was blank, gone, or did not load).
+Verdict = Literal["dangerous", "suspicious", "no_red_flags", "couldnt_check"]
 
 
 class _Model(BaseModel):
@@ -53,11 +54,11 @@ class AnalysisResult(_Model):
     id: str  # 12 hex characters; also the screenshot file name
     created_at: str  # ISO 8601, UTC
     verdict: Verdict
-    score: int | None  # None while verdict is "unscored"
+    score: int  # the points the evidence adds up to, never below 0
     headline: str
-    observations: list[str]  # the plain-English lines under the headline; consumers show up to three
-    evidence: list[Evidence]
-    points_table: list[PointsRule]
+    observations: list[str]  # the evidence sentences, most important first; consumers show up to three
+    evidence: list[Evidence]  # every finding with its points and source, in the same order
+    points_table: list[PointsRule]  # the whole table in use, so a report can show how the verdict is reached
     brand_match: BrandMatch | None
     url_defanged: str  # what was asked for
     final_url_defanged: str | None  # where the browser ended up

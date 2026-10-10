@@ -6,9 +6,9 @@ import { AnalyzerUnreachable, createAnalyzer } from "./analyzer";
 
 const GOOD = {
   id: "abc123abc123",
-  verdict: "unscored",
-  headline: "Opened in the sandbox.",
-  observations: ["one"],
+  verdict: "suspicious",
+  headline: "Suspicious: Registered 2 days ago, from RDAP",
+  observations: ["Registered 2 days ago, from RDAP"],
   url_defanged: "hxxps://example[.]com",
   final_url_defanged: "hxxps://example[.]com/",
   loaded: true,
@@ -36,7 +36,7 @@ test("analyze posts the url and parses the result", async () => {
   });
   const result = await createAnalyzer(base).analyze("https://example.com");
   assert.equal(seen, 'POST /analyze {"urls":["https://example.com"]}');
-  assert.equal(result.verdict, "unscored");
+  assert.equal(result.verdict, "suspicious");
   assert.equal(result.screenshot_url, "/shots/abc123abc123.png");
 });
 

@@ -412,6 +412,63 @@ docker image prune -f
 If `deploy/egress-firewall.sh` or the network section of `docker-compose.yml` changed, also run
 `sudo bash deploy/egress-firewall.sh`. If only `.env` changed, `docker compose up -d` is enough.
 
+## Check Tripwire against live scams (VM only)
+
+`analyzer/live_check.py` takes fresh phishing links from OpenPhish and known-good links from
+`analyzer/data/benign.txt`, runs each through the real pipeline, and prints a defanged table. It
+**opens live phishing pages**, so it refuses to run unless `TRIPWIRE_EVAL_OK=1` is in the VM's `.env`.
+Never set that on a laptop.
+
+Switch it on once, and check the firewall is in place first (expect `7`):
+
+```bash
+cd ~/tripwire
+sudo iptables -S DOCKER-USER | grep -c tripwire-egress
+sed -i 's/^TRIPWIRE_EVAL_OK=.*/TRIPWIRE_EVAL_OK=1/' .env
+grep -c '^TRIPWIRE_EVAL_OK=1' .env        # expect 1
+docker compose up -d                       # recreates the analyzer with the new value
+docker compose ps                          # analyzer: healthy
+```
+
+Run the five-scams check (5 live phishing links and 5 known-good links, three at a time; about a
+minute):
+
+```bash
+docker compose exec analyzer python live_check.py --phish 5 --benign 5
+```
+
+How to read it:
+
+- Each link shows its verdict with every signal, and again with the threat-feed hits removed. The
+  links come from OpenPhish and Tripwire also asks OpenPhish, so the first column is flattering: the
+  **"feeds removed" column is the honest measure** of the page and domain signals.
+- Many phishing links are already dead by the time they are opened. A dead page is "couldn't check"
+  (or "dangerous" if a feed still lists it). That is correct, not a miss. If most of the five are dead,
+  run it again for a different five.
+- **"said no red flags (MISSED)"** on a phishing link, and **"FALSE ALARMS"** on a known-good link,
+  are the two numbers that matter. Paste either section to whoever is tuning the scoring.
+- Add `--seed 7` to repeat exactly the same sample. Screenshots land in `data/live/<timestamp>/`.
+
+To forward live scams from your phone instead, print five fresh links (they are **not** defanged:
+paste them into the Tripwire chat, never open them):
+
+```bash
+docker compose exec analyzer python live_check.py --list 5
+```
+
+Copy the screenshots off the VM to look at them (on the VM, then on the laptop):
+
+```bash
+LATEST=$(ls -1 data/live | tail -1); sudo tar czf ~/live-$LATEST.tgz -C data/live "$LATEST"; sudo chown "$USER": ~/live-$LATEST.tgz; echo ~/live-$LATEST.tgz
+```
+
+```powershell
+gcloud compute scp --zone $ZONE "${VM}:live-<that name>.tgz" .
+```
+
+Switch the guard off again when you are done: `sed -i 's/^TRIPWIRE_EVAL_OK=.*/TRIPWIRE_EVAL_OK=/' .env`
+then `docker compose up -d`.
+
 ## Everyday commands
 
 ```bash

@@ -6,9 +6,9 @@ import { ANALYZER_DOWN, IMAGE_SOON, NO_URL, ONE_AT_A_TIME, OPENING, type Analysi
 
 const RESULT: AnalysisResult = {
   id: "abc123abc123",
-  verdict: "unscored",
-  headline: "Opened in the sandbox. No verdict yet.",
-  observations: ["Opened in the sandbox and ended on hxxps://example[.]com/"],
+  verdict: "no_red_flags",
+  headline: "No red flags found. That is not a guarantee.",
+  observations: ["Not listed by Google Safe Browsing, URLhaus or OpenPhish"],
   url_defanged: "hxxps://example[.]com",
   final_url_defanged: "hxxps://example[.]com/",
   loaded: true,
@@ -48,7 +48,7 @@ test("acknowledgment first, then the screenshot, then the verdict", async () => 
   assert.equal(sent.length, 3);
   assert.equal(sent[0], `text:${OPENING}`);
   assert.equal(sent[1], "image:abc123abc123.png:image/png:4");
-  assert.ok(sent[2].startsWith("text:Tripwire: OPENED, NO VERDICT YET"));
+  assert.ok(sent[2].startsWith("text:Tripwire: NO RED FLAGS"));
   assert.ok(!sent[2].includes("https://"));
 });
 

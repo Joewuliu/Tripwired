@@ -1,9 +1,11 @@
 // The result of one scan, as the analyzer returns it. Mirrors analyzer/contract.py; both are checked
 // against the one example in ./sample/report.sample.json. Change all three together.
 
-export type Verdict = 'dangerous' | 'suspicious' | 'no_red_flags' | 'couldnt_check' | 'unscored'
+// There is no "safe": the clean verdict is "no red flags found". "couldnt_check" is a page the sandbox
+// could not inspect (it refused us, showed a human-check wall, was blank, gone, or did not load).
+export type Verdict = 'dangerous' | 'suspicious' | 'no_red_flags' | 'couldnt_check'
 
-const VERDICTS: readonly string[] = ['dangerous', 'suspicious', 'no_red_flags', 'couldnt_check', 'unscored']
+const VERDICTS: readonly string[] = ['dangerous', 'suspicious', 'no_red_flags', 'couldnt_check']
 
 export interface Evidence {
   id: string
@@ -34,7 +36,7 @@ export interface Report {
   id: string
   created_at: string
   verdict: Verdict
-  score: number | null
+  score: number
   headline: string
   observations: string[]
   evidence: Evidence[]
@@ -129,7 +131,7 @@ export function parseReport(value: unknown): Report {
     id: str(o.id, 'id'),
     created_at: str(o.created_at, 'created_at'),
     verdict: readVerdict(o.verdict, 'verdict'),
-    score: nullable(o.score, 'score', int),
+    score: int(o.score, 'score'),
     headline: str(o.headline, 'headline'),
     observations: list(o.observations, 'observations', str),
     evidence: list(o.evidence, 'evidence', readEvidence),

@@ -1,0 +1,63 @@
+# Known-good links for checking that Tripwire does not cry wolf: banks, card issuers, payment apps,
+# government, carriers, toll agencies, and the logins people actually get texted about.
+# One URL per line. Blank lines and lines starting with # are ignored.
+
+# Banks and card issuers
+https://www.chase.com/
+https://www.bankofamerica.com/
+https://www.wellsfargo.com/
+https://www.citi.com/
+https://www.capitalone.com/
+https://www.americanexpress.com/
+https://www.discover.com/
+https://www.usbank.com/
+https://www.pnc.com/
+https://www.td.com/us/en/personal-banking
+https://www.truist.com/
+https://www.navyfederal.org/
+https://www.usaa.com/
+https://www.ally.com/
+
+# Payments and money
+https://www.paypal.com/signin
+https://www.venmo.com/
+https://www.coinbase.com/
+https://www.intuit.com/
+
+# Government
+https://www.irs.gov/
+https://www.ssa.gov/
+https://www.usps.com/
+https://www.medicare.gov/
+
+# Carriers and delivery
+https://www.ups.com/
+https://www.fedex.com/
+https://www.dhl.com/
+
+# Toll agencies
+https://www.e-zpassny.com/
+https://www.sunpass.com/
+https://www.txtag.org/
+https://www.ntta.org/
+https://www.peachpass.com/
+
+# Accounts people get "verify your account" texts about
+https://www.amazon.com/
+https://www.apple.com/
+https://appleid.apple.com/
+https://login.microsoftonline.com/
+https://accounts.google.com/
+https://www.netflix.com/login
+https://www.facebook.com/login
+https://www.instagram.com/accounts/login/
+https://www.linkedin.com/login
+https://github.com/login
+https://www.walmart.com/
+https://www.ebay.com/
+https://www.dropbox.com/login
+
+# Ordinary sites
+https://www.wikipedia.org/
+https://www.nytimes.com/
+https://example.com/

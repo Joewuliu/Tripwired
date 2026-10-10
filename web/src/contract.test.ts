@@ -8,8 +8,26 @@ test('the shared sample is a valid report, field for field', () => {
 })
 
 test('a report with nulls where the sample has values is still valid', () => {
-  const bare = { ...sample, score: null, brand_match: null, screenshot_url: null, title: null, final_status: null, final_url_defanged: null }
+  const bare = { ...sample, brand_match: null, screenshot_url: null, title: null, final_status: null, final_url_defanged: null }
   assert.equal(parseReport(bare).brand_match, null)
+})
+
+test('the score is always a number', () => {
+  assert.throws(() => parseReport({ ...sample, score: null }), ContractError)
+  assert.throws(() => parseReport({ ...sample, score: '90' }), ContractError)
+})
+
+test('the placeholder verdict from before scoring existed is gone', () => {
+  assert.throws(() => parseReport({ ...sample, verdict: 'unscored' }), ContractError)
+})
+
+test('the sample adds up: its score is the sum of its evidence', () => {
+  assert.equal(sample.score, sample.evidence.reduce((total, item) => total + item.points, 0))
+})
+
+test('every evidence id is unique, because the report keys its rows on it', () => {
+  const ids = sample.evidence.map((item) => item.id)
+  assert.equal(new Set(ids).size, ids.length)
 })
 
 test('a missing field is named in the error', () => {

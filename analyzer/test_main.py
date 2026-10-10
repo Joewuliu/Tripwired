@@ -10,18 +10,19 @@ from contract import AnalysisResult
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
 PAGE = {
-    "loaded": True, "complete": True, "final_url": "https://evil-login.example.com/signin",
-    "final_status": 200, "title": "Sign in to paypal.com", "text": "", "blocked_requests": 0,
+    "loaded": True, "complete": True, "final_url": "https://evil-login.some-small-shop.top/signin",
+    "final_status": 200, "title": "Sign in to paypal.com", "text": "Sign in to continue", "blocked_requests": 0,
     "redirects": [{"status": 302, "url": "http://short.example/x"},
-                  {"status": 200, "url": "https://evil-login.example.com/signin"}],
-    "has_screenshot": True, "error": None,
+                  {"status": 200, "url": "https://evil-login.some-small-shop.top/signin"}],
+    "has_screenshot": True, "error": None, "sensitive_fields": [],
 }
 ALL_CLEAR = [
     {"source": "Google Safe Browsing", "status": "clear"},
     {"source": "URLhaus", "status": "clear"},
     {"source": "OpenPhish", "status": "clear"},
 ]
-YOUNG = {"domain": "example.com", "registered": "2026-10-08T00:00:00Z", "age_days": 2, "source": "RDAP", "error": None}
+YOUNG = {"domain": "some-small-shop.top", "registered": "2026-10-08T00:00:00Z", "age_days": 2, "source": "RDAP", "error": None}
+OLD = {**YOUNG, "registered": "1996-01-01T00:00:00Z", "age_days": 11000}
 
 
 @pytest.fixture
@@ -58,13 +59,20 @@ def test_analyze_returns_defanged_result_and_a_fetchable_screenshot(client, monk
     body = client.post("/analyze", json={"urls": ["https://short.example/x"]}).json()
 
     AnalysisResult.model_validate(body)  # the response is exactly the shared contract
-    assert body["verdict"] == "unscored" and body["score"] is None
-    assert body["evidence"] == [] and body["points_table"] == [] and body["brand_match"] is None
+    assert body["verdict"] == "suspicious" and body["score"] == 30  # a two-day-old domain, nothing else
+    assert body["headline"] == "Suspicious: Registered 2 days ago, from RDAP"
+    assert [(e["id"], e["points"], e["source"]) for e in body["evidence"]] == [
+        ("domain_under_7_days", 30, "RDAP"),
+        ("feeds_clear", 0, "Google Safe Browsing, URLhaus, OpenPhish"),
+        ("brand_mention", 0, "Brand list"),
+    ]
+    assert body["points_table"] and {r["id"] for r in body["points_table"]} >= {"known_threat_feed", "official_domain"}
+    assert body["brand_match"] is None
     assert re.fullmatch(r"[a-f0-9]{12}", body["id"])
     assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", body["created_at"])
     assert body["loaded"] is True and body["final_status"] == 200
     assert body["url_defanged"] == "hxxps://short[.]example/x"
-    assert body["final_url_defanged"] == "hxxps://evil-login[.]example[.]com/signin"
+    assert body["final_url_defanged"] == "hxxps://evil-login[.]some-small-shop[.]top/signin"
     assert body["redirects_defanged"][0] == {"status": 302, "url": "hxxp://short[.]example/x"}
     assert body["title"] == "Sign in to paypal[.]com"
     assert "http://" not in str(body) and "https://" not in str(body)
@@ -88,17 +96,50 @@ def test_brand_findings_appear_in_the_observations_defanged(client, monkeypatch)
     )
     body = client.post("/analyze", json={"urls": ["https://paypa1.com/login"]}).json()
     assert "Domain imitates PayPal: paypa1[.]com spells \"paypal\" with look-alike characters (look-alike check)" in body["observations"]
+    assert body["brand_match"] == {
+        "brand": "PayPal", "official_domain_defanged": "paypal[.]com", "real_screenshot_url": None, "similarity": None,
+    }
     assert "paypa1.com" not in str(body)
 
 
-def test_an_official_page_is_reported_as_official(client, monkeypatch):
+def test_an_official_page_is_reported_as_official_and_not_flagged(client, monkeypatch):
     fake_world(
-        monkeypatch, final_url="https://www.chase.com/", title="Chase",
+        monkeypatch, final_url="https://www.chase.com/", title="Chase", age=OLD,
         redirects=[{"status": 200, "url": "https://www.chase.com/"}],
     )
-    lines = client.post("/analyze", json={"urls": ["https://www.chase.com/"]}).json()["observations"]
-    assert "Registered domain is official for Chase (brand list)" in lines
-    assert not any("imitates" in line or "not an official site" in line for line in lines)
+    body = client.post("/analyze", json={"urls": ["https://www.chase.com/"]}).json()
+    assert body["verdict"] == "no_red_flags" and body["score"] == 0
+    assert body["headline"] == "No red flags found. That is not a guarantee."
+    assert "Registered domain is official for Chase (brand list)" in body["observations"]
+    assert not any("imitates" in line or "not an official site" in line for line in body["observations"])
+
+
+def test_a_clean_page_is_no_red_flags_and_never_called_safe(client, monkeypatch):
+    fake_world(monkeypatch, age=OLD, title="A shop", text="Welcome")
+    body = client.post("/analyze", json={"urls": ["https://short.example/x"]}).json()
+    assert (body["verdict"], body["score"]) == ("no_red_flags", 0)
+    assert not re.search(r"\bsafe", (body["headline"] + " ".join(body["observations"])).lower().replace("google safe browsing", ""))
+
+
+def test_a_listed_page_is_dangerous_whatever_else_is_true(client, monkeypatch):
+    hit = [{"source": "OpenPhish", "status": "hit", "url": "u", "kind": "phishing", "detail": "exact URL is on the list"}]
+    fake_world(monkeypatch, feeds=hit, age=OLD, title="A shop", text="Welcome")
+    body = client.post("/analyze", json={"urls": ["https://short.example/x"]}).json()
+    assert (body["verdict"], body["score"]) == ("dangerous", 60)
+    assert body["headline"] == "Dangerous: Listed as phishing by OpenPhish"
+
+
+@pytest.mark.parametrize("overrides", [
+    dict(final_status=403, title="Error", text="Forbidden"),  # refused us
+    dict(title="Just a moment...", text="Verifying you are human. This may take a few seconds."),  # human check
+    dict(title="", text=""),  # blank
+    dict(final_status=404, title="Not found", text="Nothing here"),  # gone
+])
+def test_a_page_we_could_not_see_is_never_no_red_flags(client, monkeypatch, overrides):
+    fake_world(monkeypatch, age=OLD, **overrides)
+    body = client.post("/analyze", json={"urls": ["https://short.example/x"]}).json()
+    assert body["verdict"] == "couldnt_check"
+    assert body["headline"].startswith("Couldn't get a proper look at this link.")
 
 
 def test_a_listing_is_reported_by_name(client, monkeypatch):
@@ -125,13 +166,13 @@ def test_a_missing_key_is_shown_as_not_checked(client, monkeypatch):
 def test_a_page_that_did_not_load_is_couldnt_check_but_feeds_and_age_still_report(client, monkeypatch):
     fake_world(
         monkeypatch, loaded=False, complete=False, final_url=None, final_status=None, has_screenshot=False,
-        redirects=[], error="net::ERR_NAME_NOT_RESOLVED at https://gone.example/",
+        redirects=[], error="net::ERR_NAME_NOT_RESOLVED at https://gone.example/", age=OLD,
     )
     body = client.post("/analyze", json={"urls": ["https://gone.example/"]}).json()
     assert body["verdict"] == "couldnt_check"
     assert body["screenshot_url"] is None
     assert body["observations"][0] == "The address does not resolve (DNS lookup)"
-    assert "Registered 2 days ago, from RDAP" in body["observations"]
+    assert "Registered 30 years ago, from RDAP" in body["observations"]
     assert "https://" not in str(body) and "ERR_NAME" not in str(body)  # no raw browser error reaches a user
 
 
@@ -148,8 +189,9 @@ def test_what_the_page_asks_for_and_how_it_answered_are_reported(client, monkeyp
 
 def test_a_hosts_own_warning_page_is_reported(client, monkeypatch):
     fake_world(monkeypatch, title="Suspected phishing site | Cloudflare", text="This website has been reported")
-    lines = client.post("/analyze", json={"urls": ["https://short.example/x"]}).json()["observations"]
-    assert "The hosting provider has already flagged this page as dangerous (Cloudflare phishing warning)" in lines
+    body = client.post("/analyze", json={"urls": ["https://short.example/x"]}).json()
+    assert "The hosting provider has already flagged this page as dangerous (Cloudflare phishing warning)" in body["observations"]
+    assert body["verdict"] == "dangerous"
 
 
 def test_private_address_is_refused_without_launching_a_browser(client, monkeypatch):

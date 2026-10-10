@@ -1,14 +1,14 @@
 import * as linkify from "linkifyjs";
 
 export const OPENING = "Opening that in a sandbox. About 20 seconds.";
-export const NO_URL = "Forward me a suspicious text or link and I'll open it safely in a sandbox.";
+export const NO_URL = "Forward me a suspicious text or link and I'll open it in a sandbox for you.";
 export const IMAGE_SOON = "Screenshot checking is coming soon. For now, paste the link itself.";
 export const ONE_AT_A_TIME = "I check one link at a time, so I opened the first one.";
 export const ANALYZER_DOWN =
   "I couldn't check that right now. Don't tap the link until you can verify it another way.";
 
 const COULDNT_CHECK_HEADLINE =
-  "Couldn't open this link safely. Don't enter anything until you verify it another way.";
+  "Couldn't get a proper look at this link. Don't enter anything until you verify it another way.";
 const MAX_OBSERVATIONS = 3;
 
 /** What the analyzer sends back for one scan (the fields the reply uses). */
@@ -23,14 +23,14 @@ export interface AnalysisResult {
   screenshot_url: string | null;
 }
 
-type Verdict = "dangerous" | "suspicious" | "no_red_flags" | "couldnt_check" | "unscored";
+/** The four things Tripwire ever says. There is no "safe". */
+type Verdict = "dangerous" | "suspicious" | "no_red_flags" | "couldnt_check";
 
 const LABELS: Record<Verdict, string> = {
   dangerous: "DANGEROUS",
   suspicious: "SUSPICIOUS",
   no_red_flags: "NO RED FLAGS",
   couldnt_check: "COULDN'T CHECK",
-  unscored: "OPENED, NO VERDICT YET",
 };
 
 const ACTIONS: Record<Verdict, string> = {
@@ -38,11 +38,10 @@ const ACTIONS: Record<Verdict, string> = {
   suspicious: "Be careful. Don't enter passwords or payment details until you verify it another way.",
   no_red_flags: "If it asks for a login or payment, go to the official site yourself instead.",
   couldnt_check: "Contact the sender or company through a phone number or site you already trust.",
-  unscored: "Don't enter anything on it until a verdict is ready.",
 };
 
 function isVerdict(value: string): value is Verdict {
-  return value in LABELS;
+  return Object.hasOwn(LABELS, value); // not "in": that is also true for "constructor"
 }
 
 /** Last line of defence: no live link leaves the gateway, whatever the analyzer sent. */

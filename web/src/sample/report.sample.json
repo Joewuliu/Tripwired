@@ -2,49 +2,125 @@
   "id": "5a3c0de1f2b4",
   "created_at": "2026-10-10T17:42:00Z",
   "verdict": "dangerous",
-  "score": 90,
-  "headline": "Dangerous: this page imitates a toll service and asks for card details.",
+  "score": 115,
+  "headline": "Dangerous: Web address uses the name E-ZPass but is not an official site (brand list)",
   "observations": [
+    "Web address uses the name E-ZPass but is not an official site (brand list)",
     "Registered 2 days ago, from RDAP",
-    "Asks for a card number and security code (page scan)",
-    "Names E-ZPass but the domain is not E-ZPass's (brand list)"
+    "Page names E-ZPass and asks for sensitive information (page text)",
+    "Newly created website asks for sensitive information (RDAP, page scan)",
+    "Page asks for card details (page scan)",
+    "Not listed by Google Safe Browsing, URLhaus or OpenPhish"
   ],
   "evidence": [
     {
       "id": "impersonation",
-      "label": "Web address uses the name E-ZPass but is not an official site",
+      "label": "Web address uses the name E-ZPass but is not an official site (brand list)",
       "points": 35,
       "source": "Brand list"
     },
     {
       "id": "domain_under_7_days",
-      "label": "Website created 2 days ago",
+      "label": "Registered 2 days ago, from RDAP",
       "points": 30,
       "source": "RDAP"
     },
     {
-      "id": "sensitive_fields",
-      "label": "Page asks for a card number and security code",
+      "id": "brand_with_sensitive_fields",
+      "label": "Page names E-ZPass and asks for sensitive information (page text)",
       "points": 25,
+      "source": "Brand list, page scan"
+    },
+    {
+      "id": "young_with_sensitive_fields",
+      "label": "Newly created website asks for sensitive information (RDAP, page scan)",
+      "points": 15,
+      "source": "RDAP, page scan"
+    },
+    {
+      "id": "sensitive_fields",
+      "label": "Page asks for card details (page scan)",
+      "points": 10,
       "source": "Sandbox page scan"
     },
     {
-      "id": "known_threat_feed",
-      "label": "Not listed by any threat feed yet",
+      "id": "feeds_clear",
+      "label": "Not listed by Google Safe Browsing, URLhaus or OpenPhish",
       "points": 0,
       "source": "Google Safe Browsing, URLhaus, OpenPhish"
     }
   ],
   "points_table": [
-    { "id": "known_threat_feed", "label": "Listed as malicious by a threat feed", "points": 60 },
-    { "id": "impersonation", "label": "Names a brand on a domain that is not the brand's", "points": 35 },
-    { "id": "sensitive_fields", "label": "Asks for a password, card number, SSN or one-time code", "points": 25 },
-    { "id": "lookalike", "label": "Lookalike domain", "points": 25 },
-    { "id": "domain_under_7_days", "label": "Domain under 7 days old", "points": 30 },
-    { "id": "domain_under_30_days", "label": "Domain under 30 days old", "points": 20 },
-    { "id": "load_failed", "label": "Hides from phones or bots, or no longer resolves", "points": 10 },
-    { "id": "new_certificate", "label": "First TLS certificate under 7 days old", "points": 10 },
-    { "id": "official_domain", "label": "Official brand domain, on no feed", "points": -40 }
+    {
+      "id": "known_threat_feed",
+      "label": "Listed as malicious by a threat feed (counted once)",
+      "points": 60
+    },
+    {
+      "id": "platform_warning",
+      "label": "The hosting provider or browser vendor has flagged the page as dangerous",
+      "points": 60
+    },
+    {
+      "id": "impersonation",
+      "label": "Names a brand on a domain that is not the brand's",
+      "points": 35
+    },
+    {
+      "id": "domain_under_7_days",
+      "label": "Domain registered under 7 days ago",
+      "points": 30
+    },
+    {
+      "id": "free_host_credentials",
+      "label": "Asks for sensitive details on a free hosting platform",
+      "points": 30
+    },
+    {
+      "id": "lookalike",
+      "label": "Lookalike domain (paypa1, chasee)",
+      "points": 25
+    },
+    {
+      "id": "brand_with_sensitive_fields",
+      "label": "Names a brand and asks for sensitive details",
+      "points": 25
+    },
+    {
+      "id": "domain_under_30_days",
+      "label": "Domain registered under 30 days ago",
+      "points": 20
+    },
+    {
+      "id": "young_with_sensitive_fields",
+      "label": "New domain (under 30 days) that asks for sensitive details",
+      "points": 15
+    },
+    {
+      "id": "sensitive_fields",
+      "label": "Asks for a password, card number, SSN or one-time code",
+      "points": 10
+    },
+    {
+      "id": "free_host_many_fields",
+      "label": "Three or more sensitive fields on a free hosting platform",
+      "points": 10
+    },
+    {
+      "id": "hides_from_sandbox",
+      "label": "Hides from phones or bots, or no longer resolves",
+      "points": 10
+    },
+    {
+      "id": "popular_domain",
+      "label": "One of the 10,000 most visited domains",
+      "points": -25
+    },
+    {
+      "id": "official_domain",
+      "label": "Official brand domain, on no threat feed",
+      "points": -40
+    }
   ],
   "brand_match": {
     "brand": "E-ZPass",
@@ -55,8 +131,14 @@
   "url_defanged": "hxxps://short-link[.]example/x7Kq",
   "final_url_defanged": "hxxps://ezpass-toll-pay[.]example/pay",
   "redirects_defanged": [
-    { "status": 302, "url": "hxxps://short-link[.]example/x7Kq" },
-    { "status": 200, "url": "hxxps://ezpass-toll-pay[.]example/pay" }
+    {
+      "status": 302,
+      "url": "hxxps://short-link[.]example/x7Kq"
+    },
+    {
+      "status": 200,
+      "url": "hxxps://ezpass-toll-pay[.]example/pay"
+    }
   ],
   "title": "Unpaid toll balance",
   "loaded": true,

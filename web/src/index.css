@@ -83,9 +83,26 @@ a {
 .badge-no_red_flags {
   background: var(--clear);
 }
-.badge-couldnt_check,
-.badge-unscored {
+.badge-couldnt_check {
   background: var(--unknown);
+}
+
+.verdict-note {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.applied td {
+  font-weight: 600;
+}
+
+.applied .mark {
+  color: var(--dangerous);
+}
+
+.not-applied {
+  color: var(--muted);
 }
 
 .shot {

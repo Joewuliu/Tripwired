@@ -218,6 +218,22 @@ async def test_a_stale_list_is_downloaded_and_replaced(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_a_refresh_downloads_even_when_the_saved_copy_is_fresh(monkeypatch):
+    openphish_list("https://evil.example/x", age_s=10)
+    seen = mock_http(monkeypatch, lambda request: httpx.Response(200, text="https://today.example/y\n"))
+    await feeds.refresh_openphish()
+    assert [str(r.url) for r in seen] == [feeds.OPENPHISH_FEED]
+    assert feeds.OPENPHISH_PATH.read_text() == "https://today.example/y\n"
+
+
+@pytest.mark.asyncio
+async def test_a_refresh_with_no_download_and_no_copy_raises(monkeypatch):
+    mock_http(monkeypatch, lambda request: httpx.Response(503))
+    with pytest.raises(httpx.HTTPStatusError):
+        await feeds.refresh_openphish()
+
+
+@pytest.mark.asyncio
 async def test_a_failed_download_keeps_the_old_copy(monkeypatch):
     openphish_list("https://evil.example/x", age_s=2 * 3600)
     mock_http(monkeypatch, lambda request: httpx.Response(503))

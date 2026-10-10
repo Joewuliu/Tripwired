@@ -8,11 +8,12 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, StringConstraints
 
-from contract import AnalysisResult, Hop
+from brands import BRANDS
+from contract import AnalysisResult, BrandMatch, Hop
 from defang import defang, defang_text
 from env import load_root_env
-from observations import describe
 from pipeline import scan
+from score import judge
 
 load_root_env()  # API keys for the threat feeds live in the repo-root .env
 
@@ -27,14 +28,15 @@ class AnalyzeRequest(BaseModel):
     urls: list[Annotated[str, StringConstraints(min_length=1, max_length=2048)]] = Field(min_length=1)
 
 
-def _summary(opened: dict) -> tuple[str, str, list[str]]:
-    """(verdict, headline, observations). Placeholder until scoring exists: nothing is judged yet."""
-    if not opened["loaded"]:  # why it did not load is said by the access line in observations.describe
-        return "couldnt_check", "Couldn't open this link safely. Don't enter anything until you verify it another way.", []
-    seen = [f"Opened in the sandbox and ended on {defang(opened['final_url'] or '')}"]
-    if not opened["complete"]:
-        seen.append("The page was slow to finish loading, so only part of it was captured")
-    return "unscored", "Opened in the sandbox. No verdict yet: scoring is not wired up.", seen
+def _brand_match(brand_findings: list[dict]) -> BrandMatch | None:
+    """The brand a page imitates, for the fake-versus-real comparison (screenshots come later)."""
+    imitated = next((f for f in brand_findings if f["type"] in ("impersonation", "lookalike")), None)
+    if not imitated:
+        return None
+    official = next((b["official_domains"][0] for b in BRANDS if b["brand"] == imitated["brand"]), "")
+    return BrandMatch(
+        brand=imitated["brand"], official_domain_defanged=defang(official), real_screenshot_url=None, similarity=None
+    )
 
 
 @app.post("/analyze", response_model=AnalysisResult)
@@ -44,17 +46,17 @@ async def analyze(request: AnalyzeRequest) -> AnalysisResult:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     result = await scan(url, DATA_DIR / f"{scan_id}.png")
     opened = result.opened
-    verdict, headline, observations = _summary(opened)
+    judgement = judge(result)
     return AnalysisResult(
         id=scan_id,
         created_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        verdict=verdict,
-        score=None,
-        headline=headline,
-        observations=observations + describe(result),
-        evidence=[],  # filled in by the scoring step
-        points_table=[],
-        brand_match=None,
+        verdict=judgement.verdict,
+        score=judgement.score,
+        headline=judgement.headline,
+        observations=judgement.observations,
+        evidence=judgement.evidence,
+        points_table=judgement.points_table,
+        brand_match=_brand_match(result.brand),
         url_defanged=defang(url),
         final_url_defanged=defang(opened["final_url"]) if opened["final_url"] else None,
         redirects_defanged=[Hop(status=hop["status"], url=defang(hop["url"])) for hop in opened["redirects"]],

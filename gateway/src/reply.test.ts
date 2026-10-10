@@ -53,21 +53,67 @@ test("a link that did not load says 'Link we tried' and shows the original addre
   assert.ok(reply.endsWith("Link we tried: hxxps://short[.]example/x"));
 });
 
-test("the placeholder verdict is shown as no verdict yet", () => {
-  const reply = formatReply(result({ verdict: "unscored", headline: "Opened in the sandbox. No verdict yet." }));
-  assert.ok(reply.startsWith("Tripwire: OPENED, NO VERDICT YET"));
-});
-
 test("an unknown verdict is treated as could not check, never as clear", () => {
-  const reply = formatReply(result({ verdict: "banana" }));
-  assert.ok(reply.includes("COULDN'T CHECK"));
-  assert.ok(!reply.includes("NO RED FLAGS"));
+  for (const verdict of ["banana", "unscored", "safe", "constructor", "toString", ""]) {
+    const reply = formatReply(result({ verdict }));
+    assert.ok(reply.includes("COULDN'T CHECK"), verdict);
+    assert.ok(!reply.includes("NO RED FLAGS"), verdict);
+  }
 });
 
-test("a clean verdict says no red flags and never 'safe'", () => {
-  const reply = formatReply(result({ verdict: "no_red_flags", headline: "No red flags found.", observations: [] }));
-  assert.ok(reply.startsWith("Tripwire: NO RED FLAGS"));
-  assert.ok(!/\bsafe\b/i.test(reply), "the gateway's own wording never calls a link safe");
+// What the analyzer really sends for each verdict (see analyzer/score.py), as the phone shows it.
+const REAL: Record<string, Partial<AnalysisResult>> = {
+  dangerous: {
+    verdict: "dangerous",
+    headline: "Dangerous: Listed as phishing by OpenPhish",
+    observations: ["Listed as phishing by OpenPhish", "Registered 2 days ago, from RDAP", "Page asks for card details (page scan)"],
+  },
+  suspicious: {
+    verdict: "suspicious",
+    headline: "Suspicious: Web address uses the name Chase but is not an official site (brand list)",
+    observations: ["Web address uses the name Chase but is not an official site (brand list)", "Not listed by Google Safe Browsing, URLhaus or OpenPhish"],
+  },
+  no_red_flags: {
+    verdict: "no_red_flags",
+    headline: "No red flags found. That is not a guarantee.",
+    observations: ["Registered domain is official for Chase (brand list)", "Not listed by Google Safe Browsing, URLhaus or OpenPhish"],
+  },
+  couldnt_check: {
+    verdict: "couldnt_check",
+    headline: "Couldn't get a proper look at this link. Don't enter anything until you verify it another way.",
+    observations: ["The site refused the sandbox's phone browser (HTTP 403)"],
+    loaded: true,
+  },
+};
+const LABEL: Record<string, string> = {
+  dangerous: "Tripwire: DANGEROUS",
+  suspicious: "Tripwire: SUSPICIOUS",
+  no_red_flags: "Tripwire: NO RED FLAGS",
+  couldnt_check: "Tripwire: COULDN'T CHECK",
+};
+
+for (const [verdict, fields] of Object.entries(REAL)) {
+  test(`the ${verdict} reply says exactly that, and never claims a link is safe`, () => {
+    const reply = formatReply(result(fields));
+    assert.equal(reply.split("\n")[0], LABEL[verdict]);
+    for (const [other, label] of Object.entries(LABEL)) {
+      if (other !== verdict) assert.ok(!reply.includes(label), `${verdict} reply must not carry the ${other} label`);
+    }
+    const claim = reply.toLowerCase().replace("google safe browsing", ""); // a product name, not a claim
+    assert.ok(!/\bsafe/.test(claim), reply); // not "safe", "safely", "safety"
+  });
+}
+
+test("a page we could not inspect shows why, and which link was tried rather than 'opened'", () => {
+  const reply = formatReply(result(REAL.couldnt_check));
+  assert.ok(reply.includes("- The site refused the sandbox's phone browser (HTTP 403)"));
+  assert.ok(reply.endsWith("Link we tried: hxxps://short[.]example/x"));
+});
+
+test("a clean reply is not a green light: it carries the caveat and the official-site advice", () => {
+  const reply = formatReply(result(REAL.no_red_flags));
+  assert.ok(reply.includes("That is not a guarantee."));
+  assert.ok(reply.includes("go to the official site yourself"));
 });
 
 test("a live link in the analyzer's text is defanged on the way out", () => {
