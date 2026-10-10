@@ -1,66 +1,105 @@
-/* The look of the whole site, as variables. Colours, glass, shape and type are set here and
+/* The look of the whole site, as variables. Colours, glass, shape, spacing and type are set here and
    nowhere else: index.css only uses these names. To restyle Tripwire, edit this file.
 
-   Frutiger Aero: a bright sky, glossy translucent panels, soft shadows, rounded corners. It is made
-   from CSS gradients alone, so there are no image files to license or carry. */
+   Frutiger Aero: a bright sky and horizon, glossy translucent panels with a white top edge, soft
+   teal shadows, rounded corners, glass bubbles. The scenery is CSS only (no photograph), so there
+   is no image to license. The one file besides CSS is the Fredoka font, under the SIL Open Font
+   License (public/fonts/OFL-Fredoka.txt). */
+
+@font-face {
+  font-family: 'Fredoka';
+  src: url('/fonts/Fredoka.ttf') format('truetype');
+  font-weight: 300 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
-  /* Sky behind everything */
-  --sky-top: #7cc7ee;
-  --sky-mid: #c9ecf8;
-  --sky-bottom: #eaf8e4;
-  --sky-glow: rgba(255, 255, 255, 0.85);
+  /* Sky and horizon behind everything */
+  --sky-top: #ddf6ff;
+  --sky-mid: #b9e8f8;
+  --sky-bottom: #d6efcb;
+  --sky-glow: #ffffff;
 
   /* Text */
-  --ink: #12304a;
-  --muted: #4a6a82;
+  --ink: #123447;
+  --muted: #36576a;
+  --faint: #4a6c7e;
   --on-colour: #ffffff;
 
   /* Glass panels */
-  --glass: rgba(255, 255, 255, 0.62);
-  --glass-strong: rgba(255, 255, 255, 0.82);
-  --glass-edge: rgba(255, 255, 255, 0.9);
-  --glass-line: rgba(18, 48, 74, 0.14);
-  --glass-blur: 14px;
-  --glass-shine: linear-gradient(180deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0) 48%);
-  --shadow: 0 8px 24px rgba(18, 82, 130, 0.18), 0 1px 2px rgba(18, 82, 130, 0.2);
-  --shadow-soft: 0 3px 10px rgba(18, 82, 130, 0.14);
+  --glass: linear-gradient(155deg, rgba(255, 255, 255, 0.58), rgba(216, 244, 250, 0.36));
+  --glass-solid: #f4fcff; /* when the browser cannot blur, or transparency is reduced */
+  --glass-strong: rgba(255, 255, 255, 0.88);
+  --glass-field: rgba(248, 253, 255, 0.6);
+  --glass-edge: #83b6c8;
+  --glass-line: #92bdcd;
+  --glass-inset: inset 0 2px 0 #ffffff, inset 0 -2px 0 rgba(186, 219, 231, 0.3);
+  --glass-blur: blur(18px) saturate(1.2);
+  --shadow: 0 10px 28px rgba(55, 113, 133, 0.1), 0 2px 4px rgba(55, 113, 133, 0.03);
+  --shadow-soft: 0 2px 4px rgba(29, 85, 123, 0.04);
+  --shadow-lift: 0 3px 8px rgba(29, 85, 123, 0.12);
 
-  /* Shape */
-  --radius: 18px;
-  --radius-small: 10px;
-  --radius-pill: 999px;
+  /* Shape and spacing */
+  --radius: 20px;
+  --radius-field: 14px;
+  --radius-button: 12px;
+  --radius-pill: 20px;
+  --pad-panel: 16px;
+  --gap: 12px;
+  --tap: 44px;
 
-  /* Accent and links. Aqua, not green: the clean verdict is not a promise of safety. */
-  --accent: #1688d9;
-  --accent-deep: #0b5fa8;
-  --accent-light: #3aa6e8;
-  --focus: #ffb000;
+  /* Accent, links, focus */
+  --accent: #096c86;
+  --accent-deep: #075369;
+  --accent-top: #147e97;
+  --accent-bottom: #09657e;
+  --highlight: #7fe3eb;
+  --focus: #005fcc;
 
-  /* Verdicts: each has a base colour and a lighter top for the glossy badge */
-  --dangerous: #c62828;
-  --dangerous-light: #ef6b5f;
-  --suspicious: #b36b00;
-  --suspicious-light: #f2b13c;
-  --clear: #0b6fb8;
-  --clear-light: #4bb4ea;
-  --unknown: #536b7d;
-  --unknown-light: #93a9b8;
+  /* Verdicts: text colour, fill and edge of the flat pill. "No red flags" is aqua, not green:
+     it is not a promise of safety. */
+  --dangerous: #8a1832;
+  --dangerous-fill: #fde8ee;
+  --dangerous-edge: #efc4cf;
+  --suspicious: #754500;
+  --suspicious-fill: #fff1cf;
+  --suspicious-edge: #ead8a9;
+  --clear: #0b5e77;
+  --clear-fill: #e0f3fd;
+  --clear-edge: #b5dbea;
+  --unknown: #465264;
+  --unknown-fill: #edf1f5;
+  --unknown-edge: #d1dbe5;
 
   /* Notices */
-  --note-bg: rgba(255, 244, 205, 0.9);
-  --note-line: #e3c96a;
-  --error-bg: rgba(255, 226, 222, 0.92);
-  --error-line: #e58a82;
+  --note-bg: #fff9e9;
+  --note-line: #d6c797;
+  --error-bg: #fde8ee;
+  --error-line: #e5b4c1;
+
+  /* Glass bubbles floating in the sky */
+  --bubble-fill: radial-gradient(ellipse at 27% 18%, #ffffff 0%, rgba(255, 255, 255, 0.66) 8%, rgba(255, 255, 255, 0.1) 35%, rgba(135, 202, 219, 0.13) 57%, rgba(75, 175, 198, 0.32) 84%, rgba(224, 251, 255, 0.73) 100%);
+  --bubble-edge: rgba(92, 166, 188, 0.53);
 
   /* Type */
-  --font: 'Frutiger', 'Frutiger LT Std', 'Myriad Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
-  --font-mono: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+  --font: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+  --font-display: 'Fredoka', 'Arial Rounded MT Bold', sans-serif;
+  --font-mono: 'Cascadia Code', Consolas, 'SFMono-Regular', monospace;
+  --wordmark-fill: linear-gradient(#b5eaff 4%, #56afd3 38%, #175b85 52%, #288fb9 76%, #87d0eb 100%);
+  --wordmark-edge: #0d547a;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --radius: 24px;
+    --pad-panel: 24px;
+  }
 }
 
 @media (prefers-reduced-transparency: reduce) {
   :root {
-    --glass: #ffffff;
-    --glass-strong: #ffffff;
-    --glass-blur: 0px;
+    --glass: linear-gradient(160deg, #f3fcff, #f4fcff);
+    --glass-blur: none;
   }
 }

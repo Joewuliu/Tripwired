@@ -1,4 +1,4 @@
-/* Layout and components. Every colour, radius, shadow and font comes from theme.css. */
+/* Layout and components. Every colour, radius, shadow, spacing and font comes from theme.css. */
 * {
   box-sizing: border-box;
 }
@@ -6,126 +6,211 @@
 html {
   font-family: var(--font);
   color: var(--ink);
+  -webkit-font-smoothing: antialiased;
 }
 
 body {
   margin: 0;
+  min-width: 320px;
   min-height: 100vh;
   line-height: 1.5;
   color: var(--ink);
   background-color: var(--sky-mid);
   background-image:
-    radial-gradient(ellipse 120% 60% at 50% -10%, var(--sky-glow), transparent 70%),
-    linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 45%, var(--sky-bottom) 100%);
+    radial-gradient(ellipse at 45% -10%, var(--sky-glow) 0, rgba(255, 255, 255, 0.47) 30%, transparent 68%),
+    linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 55%, var(--sky-bottom) 100%);
   background-attachment: fixed;
+}
+
+/* Two glass bubbles drifting at the edges: decoration, never between a person and the evidence */
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  z-index: -1;
+  border: 1px solid var(--bubble-edge);
+  border-radius: 50%;
+  background: var(--bubble-fill);
+  box-shadow: inset 2px 3px 5px rgba(255, 255, 255, 0.87), inset -5px -7px 12px rgba(46, 145, 172, 0.2),
+    0 10px 24px rgba(35, 125, 150, 0.12);
+  pointer-events: none;
+}
+
+body::before {
+  width: 86px;
+  height: 86px;
+  left: -20px;
+  top: 28%;
+}
+
+body::after {
+  width: 138px;
+  height: 138px;
+  right: -50px;
+  top: 58%;
 }
 
 .page {
   max-width: 680px;
   margin: 0 auto;
-  padding: 20px 16px 56px;
+  padding: 24px 16px 56px;
 }
 
 h1 {
   font-size: 1.45rem;
   line-height: 1.25;
+  letter-spacing: -0.02em;
   margin: 8px 0 12px;
 }
 
 h2 {
-  font-size: 1.1rem;
+  font-size: 1.15rem;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
   margin: 0 0 8px;
 }
 
 a {
-  color: var(--accent-deep);
+  color: var(--accent);
+  text-underline-offset: 3px;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+button,
+a,
+input {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 :focus-visible {
   outline: 3px solid var(--focus);
-  outline-offset: 2px;
+  outline-offset: 3px;
+}
+
+::selection {
+  background: var(--highlight);
 }
 
 code {
   font-family: var(--font-mono);
   font-size: 0.9em;
   overflow-wrap: anywhere;
+  unicode-bidi: isolate;
 }
 
 .eyebrow {
-  margin: 0;
-  font-size: 0.8rem;
-  letter-spacing: 0.08em;
+  margin: 0 0 6px;
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: var(--faint);
+}
+
+.wordmark {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 650;
+  font-size: clamp(32px, 9vw, 44px);
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  color: var(--wordmark-edge);
+  -webkit-text-stroke: 0.6px var(--wordmark-edge);
+}
+
+@supports (background-clip: text) {
+  .wordmark {
+    background: var(--wordmark-fill);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
 }
 
 .lead {
   font-size: 1.05rem;
 }
 
-/* Glass panel: translucent, blurred, with a glossy top edge */
+/* Glass panel: translucent, blurred, bright top edge */
 .glass {
   position: relative;
-  margin: 16px 0;
-  padding: 16px;
+  margin: var(--gap) 0;
+  padding: var(--pad-panel);
   border: 1px solid var(--glass-edge);
   border-radius: var(--radius);
-  background: var(--glass-shine), var(--glass);
-  box-shadow: var(--shadow);
-  -webkit-backdrop-filter: blur(var(--glass-blur));
-  backdrop-filter: blur(var(--glass-blur));
+  background: var(--glass-solid);
+  box-shadow: var(--glass-inset), var(--shadow);
+}
+
+@supports (backdrop-filter: blur(12px)) or (-webkit-backdrop-filter: blur(12px)) {
+  .glass {
+    background: var(--glass);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+  }
 }
 
 .notice {
   margin: 8px 0;
-  padding: 8px 12px;
+  padding: 10px 12px;
   background: var(--note-bg);
   border: 1px solid var(--note-line);
-  border-radius: var(--radius-small);
-  font-size: 0.9rem;
+  border-radius: var(--radius-button);
+  font-size: 0.85rem;
 }
 
 .notice.error {
   background: var(--error-bg);
   border-color: var(--error-line);
+  color: var(--dangerous);
 }
 
-/* Verdict badge: glossy pill */
+/* Verdict badge: a flat pill, coloured text on a tinted fill */
 .badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   margin: 8px 0 0;
-  padding: 5px 16px;
+  padding: 5px 10px;
+  border: 1px solid var(--badge-edge);
   border-radius: var(--radius-pill);
-  color: var(--on-colour);
-  font-weight: 700;
-  font-size: 0.95rem;
-  background: linear-gradient(180deg, var(--badge-light) 0%, var(--badge) 100%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55), var(--shadow-soft);
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+  color: var(--badge);
+  background: var(--badge-fill);
+  font-weight: 650;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  white-space: nowrap;
 }
 
 .badge.small {
   margin: 0 8px 0 0;
-  padding: 2px 10px;
-  font-size: 0.78rem;
+  font-size: 0.7rem;
 }
 
 .badge-dangerous {
   --badge: var(--dangerous);
-  --badge-light: var(--dangerous-light);
+  --badge-fill: var(--dangerous-fill);
+  --badge-edge: var(--dangerous-edge);
 }
 .badge-suspicious {
   --badge: var(--suspicious);
-  --badge-light: var(--suspicious-light);
+  --badge-fill: var(--suspicious-fill);
+  --badge-edge: var(--suspicious-edge);
 }
 .badge-no_red_flags {
   --badge: var(--clear);
-  --badge-light: var(--clear-light);
+  --badge-fill: var(--clear-fill);
+  --badge-edge: var(--clear-edge);
 }
 .badge-couldnt_check {
   --badge: var(--unknown);
-  --badge-light: var(--unknown-light);
+  --badge-fill: var(--unknown-fill);
+  --badge-edge: var(--unknown-edge);
 }
 
 .report-header h1 {
@@ -136,15 +221,15 @@ code {
 .link-line {
   margin: 8px 0 0;
   color: var(--muted);
-  font-size: 0.95rem;
+  font-size: 0.9rem;
 }
 
 .why {
   margin: 8px 0 0;
-  padding: 8px 12px;
+  padding: 10px 12px;
   background: var(--glass-strong);
   border-left: 4px solid var(--unknown);
-  border-radius: var(--radius-small);
+  border-radius: var(--radius-button);
 }
 
 .lines {
@@ -168,58 +253,84 @@ code {
 }
 
 .button {
-  display: inline-block;
-  padding: 10px 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--tap);
+  padding: 10px 18px;
   border: 1px solid var(--glass-line);
-  border-radius: var(--radius-pill);
-  font: inherit;
+  border-radius: var(--radius-button);
+  font-size: 0.9rem;
   font-weight: 600;
-  color: var(--accent-deep);
+  color: var(--accent);
   text-decoration: none;
   cursor: pointer;
-  background: var(--glass-shine), var(--glass-strong);
-  box-shadow: inset 0 1px 0 var(--glass-edge), var(--shadow-soft);
+  background: linear-gradient(rgba(255, 255, 255, 0.75), rgba(204, 238, 246, 0.55));
+  box-shadow: inset 0 1px 0 #ffffff, var(--shadow-soft);
+  transition: background 0.18s, box-shadow 0.18s;
+}
+
+.button:hover:not(:disabled) {
+  background: linear-gradient(rgba(255, 255, 255, 0.88), rgba(173, 225, 241, 0.7));
+  box-shadow: var(--shadow-lift);
 }
 
 .button.primary {
   color: var(--on-colour);
   border-color: var(--accent-deep);
-  background: linear-gradient(180deg, var(--accent-light) 0%, var(--accent) 55%, var(--accent-deep) 100%);
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.25);
+  background: linear-gradient(180deg, var(--accent-top), var(--accent-bottom));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.33), 0 3px 8px rgba(8, 97, 124, 0.14);
+}
+
+.button.primary:hover:not(:disabled) {
+  background: linear-gradient(180deg, #086f87, #07566d);
 }
 
 .button:disabled {
-  opacity: 0.6;
-  cursor: progress;
+  opacity: 0.65;
+  cursor: default;
 }
 
 /* Paste-a-link box */
 .check-box label {
   display: block;
-  margin-bottom: 8px;
-  font-weight: 700;
+  margin-bottom: 7px;
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 
 .check-row {
   display: flex;
-  gap: 8px;
+  gap: 10px;
 }
 
 .check-row input {
   flex: 1;
   min-width: 0;
-  padding: 10px 14px;
-  border: 1px solid var(--glass-line);
-  border-radius: var(--radius-pill);
-  font: inherit;
-  color: var(--ink);
-  background: var(--glass-strong);
-  box-shadow: inset 0 2px 4px rgba(18, 82, 130, 0.12);
+  height: 50px;
+  padding: 12px 14px;
+  border: 1px solid #688b9c;
+  border-radius: var(--radius-field);
+  font-family: var(--font-mono);
+  font-size: 16px; /* 16px keeps iPhones from zooming in on focus */
+  background: var(--glass-field);
+  box-shadow: inset 0 2px 3px rgba(45, 105, 124, 0.08);
+}
+
+.check-row input::placeholder {
+  color: #55717f;
+  opacity: 1;
+}
+
+.check-row .button {
+  min-height: 50px;
+  min-width: 112px;
+  border-radius: var(--radius-field);
 }
 
 .check-help {
   margin: 8px 0 0;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   color: var(--muted);
 }
 
@@ -234,8 +345,8 @@ code {
 }
 
 .history a {
-  text-decoration: none;
   display: block;
+  text-decoration: none;
 }
 
 .applied td {
@@ -250,26 +361,29 @@ code {
   color: var(--muted);
 }
 
-.shot {
-  margin: 16px 0;
-}
-
 .shot img {
   display: block;
   width: 100%;
   max-width: 390px;
   height: auto;
   margin: 0 auto;
-  border: 1px solid var(--glass-line);
-  border-radius: var(--radius-small);
-  background: var(--glass-strong);
+  padding: 8px;
+  border: 1px solid #bdced6;
+  border-radius: 10px;
+  background: #f7fcfd;
+  box-shadow: 0 3px 8px rgba(29, 84, 102, 0.09);
 }
 
 .shot figcaption,
 .fineprint {
   margin-top: 6px;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   color: var(--muted);
+}
+
+.shot {
+  margin-left: 0;
+  margin-right: 0;
 }
 
 ul,
@@ -285,26 +399,28 @@ table {
   width: 100%;
   border-collapse: collapse;
   background: var(--glass-strong);
-  border-radius: var(--radius-small);
-  font-size: 0.95rem;
+  border-radius: var(--radius-button);
+  font-size: 0.9rem;
 }
 
 th,
 td {
   padding: 8px 10px;
   text-align: left;
-  border-bottom: 1px solid var(--glass-line);
+  border-bottom: 1px solid #c7dce5;
   vertical-align: top;
 }
 
 thead th {
-  font-size: 0.85rem;
-  background: var(--glass);
+  font-size: 0.8rem;
+  color: var(--muted);
+  background: rgba(237, 246, 249, 0.9);
 }
 
 .num {
   text-align: right;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .hops {
@@ -322,4 +438,18 @@ thead th {
   min-width: 2.4em;
   font-weight: 700;
   color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .glass,
+  .button,
+  .badge {
+    border: 1px solid ButtonText;
+  }
 }

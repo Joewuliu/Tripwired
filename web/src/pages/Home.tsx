@@ -6,7 +6,7 @@ export function Home() {
   const recent = readHistory()
   return (
     <main className="page">
-      <p className="eyebrow">Tripwire</p>
+      <p className="wordmark">Tripwire</p>
       <h1>Forward a suspicious text. Get a screenshot and a verdict.</h1>
       <p className="lead">
         Tripwire opens the link in a sandbox so you don&apos;t have to, collects evidence, and texts back what it found
