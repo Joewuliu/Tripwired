@@ -1,4 +1,5 @@
 """Plain-English lines about what the checks found. Each names where it came from."""
+from defang import defang_text
 from feeds import SOURCES
 
 
@@ -44,5 +45,34 @@ def describe_age(age: dict) -> list[str]:
     return ["Domain age could not be found (RDAP)"]
 
 
-def describe(feeds: list[dict], age: dict) -> list[str]:
-    return describe_feeds(feeds) + describe_age(age)
+def _names(brands: list[str]) -> str:
+    return brands[0] if len(brands) == 1 else ", ".join(brands[:-1]) + " and " + brands[-1]
+
+
+def describe_brand(findings: list[dict]) -> list[str]:
+    def brands(kind: str, detail_ends: str | None = None) -> list[str]:
+        return [
+            f["brand"] for f in findings
+            if f["type"] == kind and (detail_ends is None or f["detail"].endswith(detail_ends))
+        ]
+
+    lines = []
+    if official := brands("official"):
+        lines.append(f"Registered domain is official for {_names(official)} (brand list)")
+    if named := brands("impersonation", "in domain"):
+        lines.append(f"Web address uses the name {_names(named)} but is not an official site (brand list)")
+    if in_path := brands("impersonation", "in path"):
+        lines.append(f"Web address path names {_names(in_path)}, but this is not an official site (brand list)")
+    for finding in findings:
+        if finding["type"] == "lookalike":
+            lines.append(f"Domain imitates {finding['brand']}: {defang_text(finding['detail'])} (look-alike check)")
+    if mentioned := brands("mention"):
+        lines.append(f"Page text names {_names(mentioned)} (brand list)")
+    return lines
+
+
+def describe(feeds: list[dict], age: dict, brand: list[dict] | None = None, popular: bool = False) -> list[str]:
+    lines = describe_brand(brand or []) + describe_feeds(feeds) + describe_age(age)
+    if popular:
+        lines.append("Domain is one of the 10,000 most visited on the web (Tranco list)")
+    return lines

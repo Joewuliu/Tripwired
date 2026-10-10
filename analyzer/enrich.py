@@ -19,6 +19,11 @@ def registered_domain(hostname: str) -> str:
     return _with_platforms(hostname).top_domain_under_public_suffix
 
 
+def main_label(hostname: str) -> str:
+    """paypa1.com -> paypa1; the part a look-alike check compares."""
+    return _with_platforms(hostname).domain
+
+
 def rdap_domain(hostname: str) -> str:
     """The domain RDAP has a record for: evil.github.io -> github.io; "" if none."""
     return _icann_only(hostname).top_domain_under_public_suffix

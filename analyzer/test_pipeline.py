@@ -82,6 +82,28 @@ async def test_age_is_asked_about_the_page_we_ended_on(monkeypatch, tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_the_page_we_ended_on_is_judged_against_the_brand_list(monkeypatch, tmp_path):
+    page = opened(
+        final_url="https://paypa1-secure.top/signin", title="Log in to your PayPal account",
+        redirects=[{"status": 200, "url": "https://paypa1-secure.top/signin"}],
+    )
+    Fakes(monkeypatch, page=page)
+    result = await pipeline.scan("https://short.example/x", tmp_path / "s.png")
+    found = {(f["type"], f["brand"]) for f in result.brand}
+    assert ("lookalike", "PayPal") in found
+    assert result.popular is False
+
+
+@pytest.mark.asyncio
+async def test_a_popular_domain_is_flagged_as_such(monkeypatch, tmp_path):
+    page = opened(final_url="https://www.google.com/", redirects=[{"status": 200, "url": "https://www.google.com/"}])
+    Fakes(monkeypatch, page=page)
+    result = await pipeline.scan("https://www.google.com/", tmp_path / "s.png")
+    assert result.popular is True
+    assert {(f["type"], f["brand"]) for f in result.brand} == {("official", "Google")}
+
+
+@pytest.mark.asyncio
 async def test_a_page_that_never_loaded_is_still_checked_by_url(monkeypatch, tmp_path):
     page = opened(loaded=False, final_url=None, redirects=[], error="net::ERR_NAME_NOT_RESOLVED")
     fakes = Fakes(monkeypatch, page=page)

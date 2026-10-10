@@ -52,7 +52,7 @@ async def analyze(request: AnalyzeRequest) -> AnalysisResult:
         verdict=verdict,
         score=None,
         headline=headline,
-        observations=observations + describe(result.feeds, result.age),
+        observations=observations + describe(result.feeds, result.age, result.brand, result.popular),
         evidence=[],  # filled in by the scoring step
         points_table=[],
         brand_match=None,

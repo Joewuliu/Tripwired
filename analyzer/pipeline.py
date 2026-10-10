@@ -4,9 +4,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from enrich import domain_age
+from brands import check_brand
+from enrich import domain_age, registered_domain
 from feeds import check_feeds, failed, merge_results
-from platforms import is_free_host
+from platforms import is_free_host, is_popular
 from sandbox import open_page
 
 FEED_BUDGET_S = 3.0  # most a scan waits on threat feeds once the page itself is done
@@ -19,6 +20,8 @@ class Scan:
     opened: dict  # sandbox.open_page's result
     feeds: list[dict]  # feeds.check_feeds entries, merged over the original url and the redirect chain
     age: dict  # enrich.domain_age's result
+    brand: list[dict]  # brands.check_brand findings for the page we ended on
+    popular: bool  # one of the 10,000 most visited domains (and not someone's page on a platform)
 
 
 def _url_key(url: str) -> str:
@@ -70,5 +73,10 @@ async def scan(url: str, shot_path: Path) -> Scan:
     async def later_feeds() -> list[dict]:
         return await check_feeds(later_urls, timeout=FEED_BUDGET_S) if later_urls else []
 
-    chain_feeds, age = await asyncio.gather(later_feeds(), _age(urlsplit(final_url).hostname or ""))
-    return Scan(url=url, final_url=final_url, opened=opened, feeds=merge_results(first_feeds, chain_feeds), age=age)
+    final_host = urlsplit(final_url).hostname or ""
+    chain_feeds, age = await asyncio.gather(later_feeds(), _age(final_host))
+    brand = check_brand(final_url, opened["title"] or "", opened["text"] or "")
+    return Scan(
+        url=url, final_url=final_url, opened=opened, feeds=merge_results(first_feeds, chain_feeds), age=age,
+        brand=brand, popular=is_popular(final_host, registered_domain(final_host)),
+    )

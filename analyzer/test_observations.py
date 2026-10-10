@@ -1,4 +1,4 @@
-from observations import describe, describe_age, describe_feeds
+from observations import describe, describe_age, describe_brand, describe_feeds
 
 ALL_CLEAR = [
     {"source": "Google Safe Browsing", "status": "clear"},
@@ -53,6 +53,46 @@ def test_age_unknown_and_free_hosting():
 def test_describe_puts_feeds_before_age():
     lines = describe(ALL_CLEAR, age(3))
     assert lines[0].startswith("Not listed by") and lines[-1] == "Registered 3 days ago, from RDAP"
+
+
+def finding(kind, brand, detail=""):
+    return {"type": kind, "brand": brand, "detail": detail}
+
+
+def test_brand_lines_say_what_was_found_and_name_the_source():
+    lines = describe_brand([
+        finding("official", "Chase"),
+        finding("impersonation", "PayPal", '"paypal" in domain'),
+        finding("impersonation", "Apple", '"apple" in domain'),
+        finding("impersonation", "Netflix", '"netflix" in path'),
+        finding("lookalike", "Roblox", "robiox.com.gr resembles roblox.com"),
+        finding("mention", "Google"),
+        finding("mention", "eBay"),
+    ])
+    assert lines == [
+        "Registered domain is official for Chase (brand list)",
+        "Web address uses the name PayPal and Apple but is not an official site (brand list)",
+        "Web address path names Netflix, but this is not an official site (brand list)",
+        "Domain imitates Roblox: robiox[.]com[.]gr resembles roblox[.]com (look-alike check)",
+        "Page text names Google and eBay (brand list)",
+    ]
+
+
+def test_three_names_are_joined_with_a_comma_and_and():
+    lines = describe_brand([finding("mention", n) for n in ("Apple", "Google", "eBay")])
+    assert lines == ["Page text names Apple, Google and eBay (brand list)"]
+
+
+def test_no_brand_findings_say_nothing():
+    assert describe_brand([]) == []
+
+
+def test_describe_orders_brand_then_feeds_then_age_then_popularity():
+    lines = describe(ALL_CLEAR, age(2000), [finding("official", "Google")], popular=True)
+    assert lines[0].startswith("Registered domain is official for Google")
+    assert lines[1].startswith("Not listed by")
+    assert lines[2] == "Registered 5 years ago, from RDAP"
+    assert lines[3] == "Domain is one of the 10,000 most visited on the web (Tranco list)"
 
 
 def test_no_line_contains_a_live_link():

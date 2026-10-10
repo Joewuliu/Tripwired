@@ -1,6 +1,24 @@
 import pytest
 
-from platforms import is_free_host, is_shared_host
+from enrich import registered_domain
+from platforms import POPULAR_DOMAINS, is_free_host, is_popular, is_shared_host
+
+
+def test_the_popular_list_is_the_top_ten_thousand():
+    assert len(POPULAR_DOMAINS) == 10_000
+    assert {"google.com", "wikipedia.org"} <= POPULAR_DOMAINS
+    assert all(d == d.lower() and not d.startswith("#") for d in POPULAR_DOMAINS)
+
+
+@pytest.mark.parametrize("host", ["www.google.com", "login.microsoftonline.com", "en.wikipedia.org"])
+def test_popular_domains(host):
+    assert is_popular(host, registered_domain(host))
+
+
+@pytest.mark.parametrize("host", ["some-small-shop.top", "paypa1.com", "evil.github.io", "github.io", "evil.netlify.app"])
+def test_unpopular_and_platform_hosted_pages_are_not_popular(host):
+    """A platform may be in the top ten thousand; its users' pages are not."""
+    assert not is_popular(host, registered_domain(host))
 
 
 @pytest.mark.parametrize(

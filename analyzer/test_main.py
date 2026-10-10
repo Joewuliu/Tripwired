@@ -81,6 +81,26 @@ def test_observations_say_what_the_feeds_and_rdap_found(client, monkeypatch):
     assert "Registered 2 days ago, from RDAP" in lines
 
 
+def test_brand_findings_appear_in_the_observations_defanged(client, monkeypatch):
+    fake_world(
+        monkeypatch, final_url="https://paypa1.com/login", title="Log in",
+        redirects=[{"status": 200, "url": "https://paypa1.com/login"}],
+    )
+    body = client.post("/analyze", json={"urls": ["https://paypa1.com/login"]}).json()
+    assert "Domain imitates PayPal: paypa1[.]com spells \"paypal\" with look-alike characters (look-alike check)" in body["observations"]
+    assert "paypa1.com" not in str(body)
+
+
+def test_an_official_page_is_reported_as_official(client, monkeypatch):
+    fake_world(
+        monkeypatch, final_url="https://www.chase.com/", title="Chase",
+        redirects=[{"status": 200, "url": "https://www.chase.com/"}],
+    )
+    lines = client.post("/analyze", json={"urls": ["https://www.chase.com/"]}).json()["observations"]
+    assert "Registered domain is official for Chase (brand list)" in lines
+    assert not any("imitates" in line or "not an official site" in line for line in lines)
+
+
 def test_a_listing_is_reported_by_name(client, monkeypatch):
     hit = [{"source": "OpenPhish", "status": "hit", "url": "https://evil-login.example.com/signin",
             "kind": "phishing", "detail": "exact URL is on the list"}]
