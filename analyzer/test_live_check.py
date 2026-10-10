@@ -99,6 +99,13 @@ def test_summary_counts_misses_and_false_alarms_separately():
     assert "1 said no red flags (MISSED)" in text
 
 
+def test_summary_says_how_often_a_page_could_not_be_fully_read():
+    rows = [row("phish", "dangerous"), {**row("benign", "couldnt_check"), "unread": True},
+            {**row("benign", "no_red_flags"), "unread": False}]
+    assert "1 of 3 had a part that was too slow to read (phishing 0, known-good 1)" in "\n".join(summary(rows))
+    assert "too slow to read" not in "\n".join(summary([row("phish", "dangerous")]))
+
+
 def test_every_printed_line_is_defanged():
     lines = format_row(1, row("phish", "dangerous", score=120, url="https://paypa1-login.top/signin?a=1",
                              reasons=["Listed as phishing by OpenPhish", "Redirects to https://evil.example/x"]))

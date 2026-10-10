@@ -8,7 +8,8 @@ judge_access returns None when the page opened normally, otherwise {"kind", "det
   gone         the server says the page is gone (404, 410)
   refused      the server refused the sandbox's phone browser (401, 403, 429, 451, 503)
   bot_check    a "verify you are human" or access-denied page instead of the content
-  blank        the page finished loading and showed nothing at all
+  unreadable   the page, or a frame in it, was too slow to read: whatever it asks for we did not see
+  blank        the page finished loading and showed nothing at all (only claimed when it was read)
 
 A page that hides from automated visitors, or vanishes soon after it is sent, is mild evidence on
 its own. More importantly, in every one of these cases we did not see the real page, so a later
@@ -58,6 +59,24 @@ def judge_access(opened: dict) -> dict | None:
         return {"kind": "bot_check", "detail": wall}
     if status in REFUSED_STATUSES:
         return {"kind": "refused", "detail": f"HTTP {status}"}
+    unread = _unread(opened.get("read_errors") or [])
+    if unread:
+        return {"kind": "unreadable", "detail": unread}
     if opened.get("complete") and not text.strip() and not title.strip():
         return {"kind": "blank", "detail": "nothing was shown"}
     return None
+
+
+def _unread(read_errors: list[dict]) -> str | None:
+    """A read that failed is not an empty page: say what we could not read, or None if all that
+    matters was read. A missing screenshot or title costs the user a picture, not the verdict."""
+    page_failed = {e["what"] for e in read_errors if e.get("frame") is None}
+    if page_failed & {"text", "fields"}:
+        return "the page was too busy or slow to be read"
+    in_frames = [e["frame"] for e in read_errors if e.get("frame") is not None]
+    if not in_frames:
+        return None
+    hosts = list(dict.fromkeys(host for host in in_frames if host))  # "" is a frame with no address yet
+    if hosts:
+        return f"an embedded frame from {', '.join(hosts[:3])} was too slow to read"
+    return "an embedded frame that had not finished loading was too slow to read"

@@ -398,6 +398,19 @@ Expected: a file size, then `404` (the analyze endpoint is not on the internet).
 **From your phone**, with the laptop gateway stopped: text the Photon line a benign link such as
 `https://example.com`. Close the laptop: it must still answer.
 
+**The report link.** The reply ends with `Full report: https://<your-host>.sslip.io/api/report/<id>`.
+It is the one tappable link Tripwire sends: everything about the scanned page is defanged. Tap it
+(or open it from the laptop) and you get that scan's result as JSON:
+
+```powershell
+Invoke-RestMethod https://34-123-45-67.sslip.io/api/report/<id> | Select-Object verdict, score, headline
+Invoke-RestMethod https://34-123-45-67.sslip.io/api/report/000000000000    # 404: no such report
+```
+
+If the reply has no `Full report` line, the gateway has no `PUBLIC_URL`: `docker compose up -d`
+recreates it from `SITE_HOST`. Reports are small JSON files in `data/reports/`; they hold the same
+defanged result the reply was built from, and nothing about who asked.
+
 ## Updating
 
 After you commit and push from the laptop (Option A), or repeat the Option B copy:
@@ -497,7 +510,8 @@ reason is recorded.
   it cannot.
 - **DNS is set to 1.1.1.1 and 8.8.8.8** because Google Cloud's default resolver is the metadata
   address, which the firewall blocks.
-- **Screenshots pile up** in `./data`. Clear old ones with
-  `sudo find data -name '*.png' -mtime +7 -delete`.
+- **Screenshots and reports pile up** in `./data` and `./data/reports`. A report link stops working
+  when its file is deleted, so clear both together:
+  `sudo find data -name '*.png' -mtime +7 -delete; sudo find data/reports -name '*.json' -mtime +7 -delete`.
 - **The certificate** is issued by Let's Encrypt on first start, which needs port 80 reachable from
   the internet. If `docker compose logs caddy` shows certificate errors, re-check step 1.

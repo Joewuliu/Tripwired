@@ -36,6 +36,8 @@ services:
     build: ./gateway
     environment:
       ANALYZER_URL: http://analyzer:8001
+      # The address behind the "Full report" line in a reply: this VM's own https name.
+      PUBLIC_URL: https://${SITE_HOST:?set SITE_HOST in .env (see deploy/DEPLOY.md)}
       SPECTRUM_PROJECT_ID: ${SPECTRUM_PROJECT_ID:-}
       SPECTRUM_PROJECT_SECRET: ${SPECTRUM_PROJECT_SECRET:-}
     depends_on:

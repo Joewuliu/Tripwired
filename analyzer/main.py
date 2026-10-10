@@ -1,3 +1,4 @@
+import logging
 import re
 import secrets
 from datetime import datetime, timezone
@@ -13,15 +14,22 @@ from contract import AnalysisResult, BrandMatch, Hop
 from defang import defang, defang_text
 from env import load_root_env
 from pipeline import scan
+from reports import load_report, save_report
 from score import judge
 
 load_root_env()  # API keys for the threat feeds live in the repo-root .env
+
+log = logging.getLogger("tripwire.main")
 
 PORT = 8001
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 SCAN_ID = re.compile(r"[a-f0-9]{12}")
 
 app = FastAPI(title="Tripwire analyzer")
+
+
+def _reports_dir() -> Path:
+    return DATA_DIR / "reports"
 
 
 class AnalyzeRequest(BaseModel):
@@ -47,7 +55,7 @@ async def analyze(request: AnalyzeRequest) -> AnalysisResult:
     result = await scan(url, DATA_DIR / f"{scan_id}.png")
     opened = result.opened
     judgement = judge(result)
-    return AnalysisResult(
+    analysis = AnalysisResult(
         id=scan_id,
         created_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         verdict=judgement.verdict,
@@ -67,6 +75,19 @@ async def analyze(request: AnalyzeRequest) -> AnalysisResult:
         blocked_requests=opened["blocked_requests"],
         screenshot_url=f"/shots/{scan_id}.png" if opened["has_screenshot"] else None,
     )
+    try:
+        save_report(_reports_dir(), analysis)
+    except Exception as exc:  # a full disk must cost the report link, not the verdict
+        log.error("report %s was not saved: %s", scan_id, type(exc).__name__)
+    return analysis
+
+
+@app.get("/api/report/{report_id}", response_model=AnalysisResult)
+async def report(report_id: str) -> AnalysisResult:
+    stored = load_report(_reports_dir(), report_id)
+    if stored is None:
+        raise HTTPException(status_code=404)
+    return stored
 
 
 @app.get("/health")

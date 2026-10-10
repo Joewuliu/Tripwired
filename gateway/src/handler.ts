@@ -33,6 +33,7 @@ export async function handleInbound(
   inbound: Inbound,
   out: Outbox,
   analyzer: Analyzer = createAnalyzer(),
+  publicUrl: string | undefined = process.env.PUBLIC_URL,
 ): Promise<void> {
   if (inbound.kind === "ignore") return;
   if (inbound.kind === "image") return out.sendText(IMAGE_SOON);
@@ -50,6 +51,6 @@ export async function handleInbound(
     return out.sendText(ANALYZER_DOWN);
   }
   if (result.screenshot_url) await sendScreenshot(result.screenshot_url, out, analyzer);
-  await out.sendText(formatReply(result));
+  await out.sendText(formatReply(result, publicUrl));
   if (urls.length > 1) await out.sendText(ONE_AT_A_TIME);
 }

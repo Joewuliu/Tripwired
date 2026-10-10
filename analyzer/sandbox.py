@@ -12,22 +12,26 @@ subresources (only their first address is checked).
 import asyncio
 import html
 import logging
+import time
 from pathlib import Path
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import async_playwright
 
 from forms import READ_FIELDS_JS, sensitive_fields
 from netguard import NOT_PUBLIC, is_public, refusal_reason
 
 MAX_CONCURRENT = 3
-MAX_FRAMES = 8
+MAX_FRAMES = 16  # frames beyond this are not read; pages with that many are almost always advertising
 MAX_REDIRECTS = 10
 NAVIGATION_BUDGET_S = 15  # the whole navigation; reads after it add a few seconds
 FIRST_RESPONSE_S = 10
 DOM_READY_S = 8
 SETTLE_MS = 1500  # let script-heavy pages finish drawing
 READ_TIMEOUT_S = 4
+CLOSE_TIMEOUT_S = 3  # closing the browser; a stuck page must not hold a browser slot
+UNROUTE_TIMEOUT_S = 1
 TEXT_LIMIT = 3000
 
 log = logging.getLogger("tripwire.sandbox")
@@ -43,6 +47,7 @@ def _blank_result() -> dict:
         "title": None,
         "text": "",
         "sensitive_fields": [],  # forms.sensitive_fields: visible inputs asking for a password, card...
+        "read_errors": [],  # reads that failed: {"what": "screenshot|title|text|fields", "frame": host or None}
         "redirects": [],  # main-frame responses: {"status", "url"}
         "blocked_requests": 0,
         "has_screenshot": False,
@@ -156,37 +161,63 @@ async def _navigate(page, url: str, result: dict, deadline: float, nav: dict) ->
     await page.wait_for_timeout(SETTLE_MS)
 
 
-async def _read(coro, default=None):
-    """One read of the page. A failure keeps the others alive."""
-    try:
-        return await asyncio.wait_for(coro, READ_TIMEOUT_S)
-    except Exception as exc:
-        log.warning("read failed: %s", type(exc).__name__)
-        return default
+def _frame_host(frame) -> str:
+    """The frame's host, or "" while it has no address yet (it has not started to load)."""
+    return urlsplit(frame.url).hostname or ""
 
 
 async def _read_page(page, result: dict, shot_path: Path) -> None:
+    """Read whatever rendered, all at once, so a stalled page costs one timeout and not four.
+
+    A read that fails is NOT the same as an empty page, so each failure is recorded in
+    result["read_errors"] as {"what", "frame"} (frame is None for the page itself, else the host of
+    the embedded frame, "" if it has no address yet). The scorer treats a page it could not read as
+    one it could not inspect.
+    """
     result["final_url"] = page.url
-    await _read(page.screenshot(path=str(shot_path), timeout=READ_TIMEOUT_S * 1000))
+
+    async def read(what: str, coro, frame: str | None = None):
+        started = time.monotonic()
+        try:
+            return await asyncio.wait_for(coro, READ_TIMEOUT_S)
+        except Exception as exc:
+            log.warning("read of %s%s failed after %.1fs: %s", what, f" in a frame from {frame}" if frame else "",
+                        time.monotonic() - started, type(exc).__name__)
+            # A frame that was removed while we asked is not unreadable content; a slow one is.
+            if frame is None or isinstance(exc, (TimeoutError, PlaywrightTimeoutError)):
+                result["read_errors"].append({"what": what, "frame": frame})
+            return None
+
+    frames = page.frames[:MAX_FRAMES]  # login and payment forms often sit in an iframe, so every frame is asked
+    shot, title, text, *per_frame = await asyncio.gather(
+        read("screenshot", page.screenshot(path=str(shot_path), timeout=READ_TIMEOUT_S * 1000)),
+        read("title", page.title()),
+        read("text", page.inner_text("body")),
+        *(read("fields", frame.evaluate(READ_FIELDS_JS), None if frame == page.main_frame else _frame_host(frame))
+          for frame in frames),
+    )
     result["has_screenshot"] = shot_path.is_file()
-    result["title"] = await _read(page.title())
-    result["text"] = (await _read(page.inner_text("body"), ""))[:TEXT_LIMIT]
-    # Login and payment forms often sit in an iframe, so every frame is asked (attributes only).
-    per_frame = await asyncio.gather(*(_read(frame.evaluate(READ_FIELDS_JS), []) for frame in page.frames[:MAX_FRAMES]))
+    result["title"] = title
+    result["text"] = (text or "")[:TEXT_LIMIT]
     result["sensitive_fields"] = sensitive_fields([field for fields in per_frame for field in fields or []])
 
 
 async def _close(page, ctx, browser) -> None:
-    # Handlers still in flight would raise "context disposed" if the context closed under them.
-    try:
-        await ctx.unroute_all(behavior="ignoreErrors")
+    """Throw the browser away without waiting on the page.
+
+    A page whose script never yields blocks page.close() and context.close() until the script ends,
+    which would hold one of the few browser slots (and the user's wait) for as long as the page likes.
+    Closing the browser asks its main process to exit, and every step is capped; whatever is still
+    alive afterwards is killed when the Playwright driver shuts down at the end of open_page.
+    """
+    try:  # handlers still in flight would raise "context disposed" if the context closed under them
+        await asyncio.wait_for(ctx.unroute_all(behavior="ignoreErrors"), UNROUTE_TIMEOUT_S)
     except Exception as exc:
         log.warning("unroute failed: %s", type(exc).__name__)
-    for name, closable in (("page", page), ("context", ctx), ("browser", browser)):
-        try:
-            await closable.close()
-        except Exception as exc:
-            log.warning("closing %s failed: %s", name, type(exc).__name__)
+    try:
+        await asyncio.wait_for(browser.close(), CLOSE_TIMEOUT_S)
+    except Exception as exc:
+        log.warning("closing the browser failed (%s); the driver will end it", type(exc).__name__)
 
 
 async def open_page(url: str, shot_path: Path) -> dict:

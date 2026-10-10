@@ -1,6 +1,7 @@
 import asyncio
 import socket
 from contextlib import asynccontextmanager
+from types import SimpleNamespace
 from urllib.parse import urlparse
 
 import pytest
@@ -96,6 +97,74 @@ async def test_fields_inside_an_iframe_are_found(allow_only_loopback_ip, tmp_pat
     async with serve(routes) as (port, _):
         result = await sandbox.open_page(f"http://127.0.0.1:{port}/", tmp_path / "s.png")
     assert [f["kind"] for f in result["sensitive_fields"]] == ["card"]
+
+
+@pytest.mark.asyncio
+async def test_a_page_that_read_fine_has_no_read_errors(allow_only_loopback_ip, tmp_path):
+    async with serve({"/": (200, HTML, page("<h1>Hello</h1>" + FORM))}) as (port, _):
+        result = await sandbox.open_page(f"http://127.0.0.1:{port}/", tmp_path / "s.png")
+    assert result["read_errors"] == []
+
+
+@pytest.mark.asyncio
+async def test_a_stalled_iframe_is_recorded_as_unread_not_as_having_no_form(allow_only_loopback_ip, tmp_path):
+    """The hole this closes: the form inside a frame that never answered used to read as 'no fields'."""
+    routes = {
+        "/": (200, HTML, page('<h1>Welcome</h1><iframe src="/slow" width="300" height="200"></iframe>')),
+        "/slow": (200, HTML, None),  # headers, then silence
+    }
+    async with serve(routes) as (port, _):
+        result = await sandbox.open_page(f"http://127.0.0.1:{port}/", tmp_path / "s.png")
+    assert result["loaded"] is True and "Welcome" in result["text"]
+    assert result["sensitive_fields"] == []
+    # the frame had not started to load, so it has no address to name
+    assert result["read_errors"] == [{"what": "fields", "frame": ""}]
+
+
+@pytest.mark.asyncio
+async def test_a_page_that_never_gives_the_thread_back_cannot_hold_a_browser_slot(allow_only_loopback_ip, tmp_path):
+    """Closing a page waits for its script. A page that blocks for a minute used to hold the scan,
+    and one of three browser slots, for a minute."""
+    body = page("<h1>Sign in</h1><script>setTimeout(() => { const t = Date.now(); while (Date.now() - t < 60000); }, 300)</script>")
+    async with serve({"/": (200, HTML, body)}) as (port, _):
+        started = asyncio.get_running_loop().time()
+        result = await sandbox.open_page(f"http://127.0.0.1:{port}/", tmp_path / "s.png")
+        took = asyncio.get_running_loop().time() - started
+    assert took < 14, f"took {took:.1f}s"
+    assert {e["what"] for e in result["read_errors"]} == {"screenshot", "title", "text", "fields"}
+    assert result["has_screenshot"] is False
+    assert result["loaded"] is True
+
+
+@pytest.mark.asyncio
+async def test_reads_are_made_together_so_stalls_do_not_add_up(tmp_path):
+    """Four reads that each hang cost one timeout, not four."""
+    async def hang(*args, **kwargs):
+        await asyncio.sleep(30)
+
+    frame = SimpleNamespace(url="https://frame.example/x", evaluate=hang)
+    main_frame = SimpleNamespace(url="https://page.example/", evaluate=hang)
+    page_stub = SimpleNamespace(url="https://page.example/", screenshot=hang, title=hang, inner_text=hang,
+                                frames=[main_frame, frame], main_frame=main_frame)
+    result = {"read_errors": [], "final_url": None}
+    started = asyncio.get_running_loop().time()
+    await sandbox._read_page(page_stub, result, tmp_path / "s.png")
+    took = asyncio.get_running_loop().time() - started
+    assert took < sandbox.READ_TIMEOUT_S + 1.5, f"took {took:.1f}s"
+    failed = {(e["what"], e["frame"]) for e in result["read_errors"]}
+    assert failed == {
+        ("fields", None), ("fields", "frame.example"), ("screenshot", None), ("text", None), ("title", None),
+    }
+    assert result["title"] is None and result["text"] == "" and result["sensitive_fields"] == []
+
+
+@pytest.mark.asyncio
+async def test_a_page_that_is_still_navigating_does_not_end_the_scan(allow_only_loopback_ip, tmp_path):
+    body = page("<h1>Just a moment</h1><script>setTimeout(() => location.reload(), 250)</script>")
+    async with serve({"/": (200, HTML, body)}) as (port, _):
+        result = await sandbox.open_page(f"http://127.0.0.1:{port}/", tmp_path / "s.png")
+    assert result["loaded"] is True
+    assert result["text"] or result["read_errors"], "either it was read or the failure was recorded"
 
 
 @pytest.mark.asyncio

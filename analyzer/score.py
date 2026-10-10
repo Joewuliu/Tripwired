@@ -66,6 +66,8 @@ _ACCESS = {  # kind -> (sentence, source)
     "refused": ("The site refused the sandbox's phone browser ({detail})", "Sandbox"),
     "bot_check": ("The site showed a human-verification or access-denied page instead of its content ({detail})", "Sandbox"),
     "blank": ("The page opened but showed nothing (page scan)", "Sandbox page scan"),
+    # Not held against the site (it may just be heavy), but never reported as a clean page either.
+    "unreadable": ("Part of the page could not be read: {detail} (page scan)", "Sandbox page scan"),
 }
 
 
@@ -108,7 +110,9 @@ def _access(access: dict | None) -> list[Evidence]:
         return []
     sentence, source = _ACCESS[access["kind"]]
     rule_id = "hides_from_sandbox" if access["kind"] in HIDES else "not_opened"
-    return [_item(rule_id, sentence.format(detail=access["detail"]), source)]
+    if access["kind"] == "unreadable":
+        rule_id = "not_read"
+    return [_item(rule_id, defang_text(sentence.format(detail=access["detail"])), source)]  # a frame's host is a link
 
 
 def _warning(warning: str | None) -> list[Evidence]:

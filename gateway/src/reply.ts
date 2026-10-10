@@ -53,8 +53,34 @@ export function defangText(text: string): string {
   return out;
 }
 
-/** The verdict message: label, headline, up to three observations, what to do, which link. */
-export function formatReply(result: AnalysisResult): string {
+const REPORT_PATH = "/api/report"; // moves to "/r" when the report page is served from the same host
+const REPORT_ID = /^[a-f0-9]{12}$/;
+
+/**
+ * The link to a scan's full report, or null when there is nothing safe to link to.
+ *
+ * It is the one live (tappable) link the gateway ever sends, so it is built from the operator's own
+ * PUBLIC_URL and an id that must be exactly 12 hex characters. Nothing the analyzer or the scanned
+ * page says can reach it.
+ */
+export function reportLink(publicUrl: string | undefined, id: string): string | null {
+  if (!publicUrl || !REPORT_ID.test(id)) return null;
+  let base: URL;
+  try {
+    base = new URL(publicUrl);
+  } catch {
+    return null;
+  }
+  if (base.protocol !== "https:" && base.protocol !== "http:") return null;
+  return `${base.origin}${REPORT_PATH}/${id}`; // origin: no credentials, path or query from the setting
+}
+
+/**
+ * The verdict message: label, headline, up to three observations, what to do, which link, and, when
+ * PUBLIC_URL is set, a link to the full report. Everything that came from the analyzer is defanged;
+ * the report link is added afterwards so it stays tappable.
+ */
+export function formatReply(result: AnalysisResult, publicUrl?: string): string {
   const known = isVerdict(result.verdict);
   const verdict: Verdict = known ? (result.verdict as Verdict) : "couldnt_check";
   const headline = known ? result.headline : COULDNT_CHECK_HEADLINE;
@@ -72,5 +98,7 @@ export function formatReply(result: AnalysisResult): string {
     ACTIONS[verdict],
     `${opened ? "Link opened" : "Link we tried"}: ${link ?? result.url_defanged}`,
   ];
-  return defangText(lines.join("\n"));
+  const message = defangText(lines.join("\n"));
+  const report = reportLink(publicUrl, result.id);
+  return report ? `${message}\n\nFull report: ${report}` : message;
 }

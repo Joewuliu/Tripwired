@@ -84,6 +84,12 @@ def summary(rows: list[dict]) -> list[str]:
         f"  {benign['flagged']} flagged (FALSE ALARMS), {benign['clear']} no red flags, "
         f"{benign['undecided']} couldn't check",
     ]
+    unread = [r for r in rows if r.get("unread")]
+    if unread:  # a page we could not fully read is never cleared; this says how often that happens
+        lines.append(
+            f"{len(unread)} of {len(rows)} had a part that was too slow to read "
+            f"(phishing {sum(r['label'] == 'phish' for r in unread)}, known-good {sum(r['label'] == 'benign' for r in unread)})"
+        )
     return lines
 
 
@@ -106,11 +112,13 @@ async def _check(index: int, url: str, label: str, shots: Path, gate: asyncio.Se
             bare = judge(dataclasses.replace(result, feeds=[]))  # the same evidence, feed hits removed
         except Exception as exc:  # one bad link must not end the run
             return {"label": label, "url": url, "verdict": "error", "score": 0, "verdict_no_feeds": "error",
-                    "score_no_feeds": 0, "seconds": time.monotonic() - started, "reasons": [f"error: {type(exc).__name__}"]}
+                    "score_no_feeds": 0, "seconds": time.monotonic() - started, "unread": False,
+                    "reasons": [f"error: {type(exc).__name__}"]}
         return {
             "label": label, "url": url, "verdict": full.verdict, "score": full.score,
             "verdict_no_feeds": bare.verdict, "score_no_feeds": bare.score,
             "seconds": time.monotonic() - started, "reasons": full.observations[:3],
+            "unread": any(item.id == "not_read" for item in full.evidence),  # a page or frame was too slow to read
         }
 
 

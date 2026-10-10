@@ -3,8 +3,8 @@
 #
 # Only what a visitor needs is forwarded. POST /analyze is NOT: the gateway reaches it over the
 # private network. Later steps add their routes here, one handle block each:
-#   report page and JSON (/r/*, /api/report/*), the event stream (/events, with flush_interval -1),
-#   and the static web build.
+#   the report page (/r/*) and the static web build, and the event stream (/events, with
+#   flush_interval -1).
 {$SITE_HOST} {
 	encode gzip
 
@@ -16,6 +16,12 @@
 
 	# Sandbox screenshots. The analyzer itself accepts only 12-hex ids and answers 404 otherwise.
 	handle /shots/*.png {
+		reverse_proxy analyzer:8001
+	}
+
+	# A finished scan's report, as JSON, by its 12-hex id (the link in a reply). The analyzer's route
+	# is GET-only, so it answers 405 to anything else, and 404 to an id it does not have.
+	handle /api/report/* {
 		reverse_proxy analyzer:8001
 	}
 

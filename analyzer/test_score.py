@@ -186,6 +186,20 @@ def test_a_page_we_could_not_inspect_is_couldnt_check(kind, detail, loaded):
     assert result.headline.startswith("Couldn't get a proper look at this link.")
 
 
+def test_a_page_we_could_not_read_is_never_clean_and_costs_no_points():
+    unreadable = {"kind": "unreadable", "detail": "an embedded frame from ads.example was too slow to read"}
+    result = judge(scan(access=unreadable))
+    assert result.verdict == "couldnt_check" and result.score == 0
+    note = next(e for e in result.evidence if e.id == "not_read")
+    assert note.points == 0
+    assert "ads[.]example" in note.label and "ads.example" not in note.label  # defanged
+
+
+def test_a_listing_still_wins_on_a_page_we_could_not_read():
+    unreadable = {"kind": "unreadable", "detail": "the page was too busy or slow to be read"}
+    assert judge(scan(feeds=[listed()], access=unreadable)).verdict == "dangerous"
+
+
 def test_refused_alone_is_weak_evidence():
     result = judge(scan(access={"kind": "refused", "detail": "HTTP 403"}))
     assert result.score == 10

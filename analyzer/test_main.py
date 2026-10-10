@@ -82,6 +82,58 @@ def test_analyze_returns_defanged_result_and_a_fetchable_screenshot(client, monk
     assert shot.content == PNG
 
 
+def test_every_scan_is_kept_and_served_back_unchanged(client, monkeypatch, tmp_path):
+    fake_world(monkeypatch, age=OLD, title="A shop", text="Welcome")
+    body = client.post("/analyze", json={"urls": ["https://short.example/x"]}).json()
+    stored = client.get(f"/api/report/{body['id']}")
+    assert stored.status_code == 200
+    assert stored.json() == body  # the report is the scan result, nothing added or lost
+    assert (tmp_path / "reports" / f"{body['id']}.json").is_file()
+
+
+def test_a_report_is_served_for_every_verdict(client, monkeypatch):
+    for kwargs in (dict(feeds=[{"source": "OpenPhish", "status": "hit", "url": "u", "kind": "phishing", "detail": "x"}]),
+                   dict(final_status=403, title="Error", text="Forbidden")):
+        fake_world(monkeypatch, age=OLD, **kwargs)
+        body = client.post("/analyze", json={"urls": ["https://short.example/x"]}).json()
+        assert client.get(f"/api/report/{body['id']}").json()["verdict"] == body["verdict"]
+
+
+def test_the_analysis_survives_a_report_that_cannot_be_saved(client, monkeypatch):
+    def disk_full(directory, result):
+        raise OSError("no space left on device")
+
+    fake_world(monkeypatch, age=OLD, title="A shop", text="Welcome")
+    monkeypatch.setattr(main, "save_report", disk_full)
+    response = client.post("/analyze", json={"urls": ["https://short.example/x"]})
+    assert response.status_code == 200
+    assert response.json()["verdict"] == "no_red_flags"
+    assert client.get(f"/api/report/{response.json()['id']}").status_code == 404
+
+
+@pytest.mark.parametrize("report_id", ["000000000000", "not-an-id", "ABCDEF012345", "..%2F..%2Fetc%2Fpasswd", "abc"])
+def test_an_unknown_or_malformed_report_is_404(client, report_id):
+    assert client.get(f"/api/report/{report_id}").status_code == 404
+
+
+def test_a_report_can_only_be_read_never_written_through_the_api(client, monkeypatch):
+    """The proxy forwards /api/report/* to the analyzer as is, so the route itself must be read-only."""
+    fake_world(monkeypatch, age=OLD, title="A shop", text="Welcome")
+    report_id = client.post("/analyze", json={"urls": ["https://short.example/x"]}).json()["id"]
+    for method in ("post", "put", "patch", "delete"):
+        assert getattr(client, method)(f"/api/report/{report_id}").status_code == 405, method
+    assert client.get(f"/api/report/{report_id}").status_code == 200
+
+
+def test_the_private_address_refusal_is_kept_too(client, monkeypatch):
+    def no_browser():
+        raise AssertionError("a browser was launched")
+
+    monkeypatch.setattr(sandbox, "async_playwright", no_browser)
+    body = client.post("/analyze", json={"urls": ["http://169.254.169.254/latest/meta-data/"]}).json()
+    assert client.get(f"/api/report/{body['id']}").json()["verdict"] == "couldnt_check"
+
+
 def test_observations_say_what_the_feeds_and_rdap_found(client, monkeypatch):
     fake_world(monkeypatch)
     lines = client.post("/analyze", json={"urls": ["https://short.example/x"]}).json()["observations"]
