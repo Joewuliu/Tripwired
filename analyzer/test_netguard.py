@@ -2,7 +2,7 @@ import socket
 
 import pytest
 
-from netguard import is_public
+from netguard import NOT_PUBLIC, NOT_WEB, UNRESOLVED, is_public, refusal_reason
 
 
 @pytest.mark.parametrize(
@@ -59,3 +59,27 @@ def test_name_that_does_not_resolve_is_refused(monkeypatch):
 
     monkeypatch.setattr(socket, "getaddrinfo", fail)
     assert is_public("https://nowhere.test/") is False
+    assert refusal_reason("https://nowhere.test/") == UNRESOLVED
+
+
+@pytest.mark.parametrize("url,reason", [
+    ("https://93.184.216.34/", None),
+    ("http://127.0.0.1/", NOT_PUBLIC),
+    ("http://169.254.169.254/latest/meta-data/", NOT_PUBLIC),
+    ("http://[::ffff:10.0.0.1]/", NOT_PUBLIC),
+    ("file:///etc/passwd", NOT_WEB),
+    ("javascript:alert(1)", NOT_WEB),
+    ("http://", NOT_WEB),
+    ("http://[::1", NOT_WEB),
+])
+def test_the_reason_for_a_refusal_is_told_apart(url, reason):
+    assert refusal_reason(url) == reason
+
+
+def test_a_mixed_public_and_private_answer_is_not_public(monkeypatch):
+    answer = [
+        (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443)),
+        (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.168.1.9", 443)),
+    ]
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **k: answer)
+    assert refusal_reason("https://rebind.test/") == NOT_PUBLIC

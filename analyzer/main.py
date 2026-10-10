@@ -29,9 +29,8 @@ class AnalyzeRequest(BaseModel):
 
 def _summary(opened: dict) -> tuple[str, str, list[str]]:
     """(verdict, headline, observations). Placeholder until scoring exists: nothing is judged yet."""
-    if not opened["loaded"]:
-        reason = defang_text(opened["error"] or "the page did not load")
-        return "couldnt_check", "Couldn't open this link safely. Don't enter anything until you verify it another way.", [reason]
+    if not opened["loaded"]:  # why it did not load is said by the access line in observations.describe
+        return "couldnt_check", "Couldn't open this link safely. Don't enter anything until you verify it another way.", []
     seen = [f"Opened in the sandbox and ended on {defang(opened['final_url'] or '')}"]
     if not opened["complete"]:
         seen.append("The page was slow to finish loading, so only part of it was captured")
@@ -52,7 +51,7 @@ async def analyze(request: AnalyzeRequest) -> AnalysisResult:
         verdict=verdict,
         score=None,
         headline=headline,
-        observations=observations + describe(result.feeds, result.age, result.brand, result.popular),
+        observations=observations + describe(result),
         evidence=[],  # filled in by the scoring step
         points_table=[],
         brand_match=None,

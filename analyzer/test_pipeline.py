@@ -95,6 +95,24 @@ async def test_the_page_we_ended_on_is_judged_against_the_brand_list(monkeypatch
 
 
 @pytest.mark.asyncio
+async def test_the_new_signals_are_carried_on_the_scan(monkeypatch, tmp_path):
+    fields = [{"kind": "password", "type": "password", "name": "pw", "id": ""}]
+    page = opened(sensitive_fields=fields, final_status=403, title="Suspected phishing site | Cloudflare", text="x")
+    Fakes(monkeypatch, page=page)
+    result = await pipeline.scan("https://short.example/x", tmp_path / "s.png")
+    assert result.fields == fields
+    assert result.warning == "Cloudflare phishing warning"
+    assert result.access == {"kind": "refused", "detail": "HTTP 403"}
+
+
+@pytest.mark.asyncio
+async def test_an_ordinary_page_has_no_warning_no_fields_and_normal_access(monkeypatch, tmp_path):
+    Fakes(monkeypatch, page=opened(title="A shop", text="Welcome to the shop"))
+    result = await pipeline.scan("https://short.example/x", tmp_path / "s.png")
+    assert (result.fields, result.warning, result.access) == ([], None, None)
+
+
+@pytest.mark.asyncio
 async def test_a_popular_domain_is_flagged_as_such(monkeypatch, tmp_path):
     page = opened(final_url="https://www.google.com/", redirects=[{"status": 200, "url": "https://www.google.com/"}])
     Fakes(monkeypatch, page=page)

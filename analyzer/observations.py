@@ -1,6 +1,7 @@
 """Plain-English lines about what the checks found. Each names where it came from."""
 from defang import defang_text
 from feeds import SOURCES
+from forms import kinds_asked_for
 
 
 def _joined(names: list[str]) -> str:
@@ -71,8 +72,50 @@ def describe_brand(findings: list[dict]) -> list[str]:
     return lines
 
 
-def describe(feeds: list[dict], age: dict, brand: list[dict] | None = None, popular: bool = False) -> list[str]:
-    lines = describe_brand(brand or []) + describe_feeds(feeds) + describe_age(age)
-    if popular:
+_ASKS_FOR = {
+    "password": "a password",
+    "card": "card details",
+    "ssn": "a Social Security number",
+    "bank": "bank account details",
+    "otp": "a one-time code",
+    "pin": "a PIN",
+}
+
+
+def describe_fields(fields: list[dict]) -> list[str]:
+    asked = [_ASKS_FOR[kind] for kind in kinds_asked_for(fields)]
+    return [f"Page asks for {_names(asked)} (page scan)"] if asked else []
+
+
+def describe_warning(warning: str | None) -> list[str]:
+    return [f"The hosting provider has already flagged this page as dangerous ({warning})"] if warning else []
+
+
+_ACCESS = {
+    "not_public": "Not a public web address, so it was not opened",
+    "unresolved": "The address does not resolve (DNS lookup)",
+    "unreachable": "The page did not load (browser)",
+    "gone": "The page is gone ({detail})",
+    "refused": "The site refused the sandbox's phone browser ({detail})",
+    "bot_check": "The site showed a human-verification or access-denied page instead of its content ({detail})",
+    "blank": "The page opened but showed nothing (page scan)",
+}
+
+
+def describe_access(access: dict | None) -> list[str]:
+    return [_ACCESS[access["kind"]].format(detail=access["detail"])] if access else []
+
+
+def describe(scan) -> list[str]:
+    """Every line for one pipeline.Scan: what we could see first, then what it adds up to."""
+    lines = (
+        describe_access(scan.access)
+        + describe_warning(scan.warning)
+        + describe_brand(scan.brand)
+        + describe_fields(scan.fields)
+        + describe_feeds(scan.feeds)
+        + describe_age(scan.age)
+    )
+    if scan.popular:
         lines.append("Domain is one of the 10,000 most visited on the web (Tranco list)")
     return lines

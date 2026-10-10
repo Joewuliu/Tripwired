@@ -130,8 +130,26 @@ def test_a_page_that_did_not_load_is_couldnt_check_but_feeds_and_age_still_repor
     body = client.post("/analyze", json={"urls": ["https://gone.example/"]}).json()
     assert body["verdict"] == "couldnt_check"
     assert body["screenshot_url"] is None
+    assert body["observations"][0] == "The address does not resolve (DNS lookup)"
     assert "Registered 2 days ago, from RDAP" in body["observations"]
-    assert "https://" not in str(body)
+    assert "https://" not in str(body) and "ERR_NAME" not in str(body)  # no raw browser error reaches a user
+
+
+def test_what_the_page_asks_for_and_how_it_answered_are_reported(client, monkeypatch):
+    fake_world(
+        monkeypatch, final_status=403, title="Sign in", text="Enter your details",
+        sensitive_fields=[{"kind": "password", "type": "password", "name": "pw", "id": ""},
+                          {"kind": "card", "type": "text", "name": "cc", "id": ""}],
+    )
+    lines = client.post("/analyze", json={"urls": ["https://short.example/x"]}).json()["observations"]
+    assert "Page asks for a password and card details (page scan)" in lines
+    assert "The site refused the sandbox's phone browser (HTTP 403)" in lines
+
+
+def test_a_hosts_own_warning_page_is_reported(client, monkeypatch):
+    fake_world(monkeypatch, title="Suspected phishing site | Cloudflare", text="This website has been reported")
+    lines = client.post("/analyze", json={"urls": ["https://short.example/x"]}).json()["observations"]
+    assert "The hosting provider has already flagged this page as dangerous (Cloudflare phishing warning)" in lines
 
 
 def test_private_address_is_refused_without_launching_a_browser(client, monkeypatch):
@@ -143,6 +161,7 @@ def test_private_address_is_refused_without_launching_a_browser(client, monkeypa
     assert body["verdict"] == "couldnt_check"
     assert body["loaded"] is False
     assert body["screenshot_url"] is None
+    assert body["observations"][0] == "Not a public web address, so it was not opened"
 
 
 @pytest.mark.parametrize("payload", [{}, {"urls": []}, {"urls": [""]}, {"urls": ["x" * 3000]}, {"urls": "https://a.test"}])

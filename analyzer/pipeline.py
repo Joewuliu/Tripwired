@@ -4,9 +4,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from access import judge_access
 from brands import check_brand
 from enrich import domain_age, registered_domain
 from feeds import check_feeds, failed, merge_results
+from interstitials import find_platform_warning
 from platforms import is_free_host, is_popular
 from sandbox import open_page
 
@@ -22,6 +24,9 @@ class Scan:
     age: dict  # enrich.domain_age's result
     brand: list[dict]  # brands.check_brand findings for the page we ended on
     popular: bool  # one of the 10,000 most visited domains (and not someone's page on a platform)
+    fields: list[dict]  # forms.sensitive_fields: what the page's visible inputs ask for
+    warning: str | None  # interstitials.find_platform_warning: the host's own phishing-warning page
+    access: dict | None  # access.judge_access: None when the sandbox saw the page normally
 
 
 def _url_key(url: str) -> str:
@@ -79,4 +84,7 @@ async def scan(url: str, shot_path: Path) -> Scan:
     return Scan(
         url=url, final_url=final_url, opened=opened, feeds=merge_results(first_feeds, chain_feeds), age=age,
         brand=brand, popular=is_popular(final_host, registered_domain(final_host)),
+        fields=opened.get("sensitive_fields", []),
+        warning=find_platform_warning(opened["title"], opened["text"]),
+        access=judge_access(opened),
     )
