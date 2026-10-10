@@ -1,8 +1,11 @@
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 
 import main
 import sandbox
+from contract import AnalysisResult
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
 
@@ -35,7 +38,11 @@ def test_analyze_returns_defanged_result_and_a_fetchable_screenshot(client, monk
     monkeypatch.setattr(main, "open_page", fake_open_page())
     body = client.post("/analyze", json={"urls": ["https://short.example/x"]}).json()
 
+    AnalysisResult.model_validate(body)  # the response is exactly the shared contract
     assert body["verdict"] == "unscored" and body["score"] is None
+    assert body["evidence"] == [] and body["points_table"] == [] and body["brand_match"] is None
+    assert re.fullmatch(r"[a-f0-9]{12}", body["id"])
+    assert re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", body["created_at"])
     assert body["loaded"] is True and body["final_status"] == 200
     assert body["url_defanged"] == "hxxps://short[.]example/x"
     assert body["final_url_defanged"] == "hxxps://evil-login[.]example[.]com/signin"

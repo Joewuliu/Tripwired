@@ -1,0 +1,67 @@
+{
+  "id": "5a3c0de1f2b4",
+  "created_at": "2026-10-10T17:42:00Z",
+  "verdict": "dangerous",
+  "score": 90,
+  "headline": "Dangerous: this page imitates a toll service and asks for card details.",
+  "observations": [
+    "Registered 2 days ago, from RDAP",
+    "Asks for a card number and security code (page scan)",
+    "Names E-ZPass but the domain is not E-ZPass's (brand list)"
+  ],
+  "evidence": [
+    {
+      "id": "impersonation",
+      "label": "Web address uses the name E-ZPass but is not an official site",
+      "points": 35,
+      "source": "Brand list"
+    },
+    {
+      "id": "domain_under_7_days",
+      "label": "Website created 2 days ago",
+      "points": 30,
+      "source": "RDAP"
+    },
+    {
+      "id": "sensitive_fields",
+      "label": "Page asks for a card number and security code",
+      "points": 25,
+      "source": "Sandbox page scan"
+    },
+    {
+      "id": "known_threat_feed",
+      "label": "Not listed by any threat feed yet",
+      "points": 0,
+      "source": "Google Safe Browsing, URLhaus, OpenPhish"
+    }
+  ],
+  "points_table": [
+    { "id": "known_threat_feed", "label": "Listed as malicious by a threat feed", "points": 60 },
+    { "id": "impersonation", "label": "Names a brand on a domain that is not the brand's", "points": 35 },
+    { "id": "sensitive_fields", "label": "Asks for a password, card number, SSN or one-time code", "points": 25 },
+    { "id": "lookalike", "label": "Lookalike domain", "points": 25 },
+    { "id": "domain_under_7_days", "label": "Domain under 7 days old", "points": 30 },
+    { "id": "domain_under_30_days", "label": "Domain under 30 days old", "points": 20 },
+    { "id": "load_failed", "label": "Hides from phones or bots, or no longer resolves", "points": 10 },
+    { "id": "new_certificate", "label": "First TLS certificate under 7 days old", "points": 10 },
+    { "id": "official_domain", "label": "Official brand domain, on no feed", "points": -40 }
+  ],
+  "brand_match": {
+    "brand": "E-ZPass",
+    "official_domain_defanged": "e-zpassny[.]com",
+    "real_screenshot_url": null,
+    "similarity": null
+  },
+  "url_defanged": "hxxps://short-link[.]example/x7Kq",
+  "final_url_defanged": "hxxps://ezpass-toll-pay[.]example/pay",
+  "redirects_defanged": [
+    { "status": 302, "url": "hxxps://short-link[.]example/x7Kq" },
+    { "status": 200, "url": "hxxps://ezpass-toll-pay[.]example/pay" }
+  ],
+  "title": "Unpaid toll balance",
+  "loaded": true,
+  "complete": true,
+  "final_status": 200,
+  "blocked_requests": 0,
+  "screenshot_url": "/sample/shot.png"
+}
