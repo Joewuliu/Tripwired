@@ -1,0 +1,5 @@
+# Files that run on the Linux VM must keep LF line endings, whatever Windows does at checkout.
+*.sh text eol=lf
+Dockerfile text eol=lf
+Caddyfile text eol=lf
+docker-compose.yml text eol=lf

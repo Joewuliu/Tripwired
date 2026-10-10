@@ -1,0 +1,25 @@
+# HTTPS front door. SITE_HOST is a hostname such as 34-123-45-67.sslip.io; Caddy gets and renews
+# its certificate by itself.
+#
+# Only what a visitor needs is forwarded. POST /analyze is NOT: the gateway reaches it over the
+# private network. Later steps add their routes here, one handle block each:
+#   report page and JSON (/r/*, /api/report/*), the event stream (/events, with flush_interval -1),
+#   and the static web build.
+{$SITE_HOST} {
+	encode gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+	}
+
+	# Sandbox screenshots. The analyzer itself accepts only 12-hex ids and answers 404 otherwise.
+	handle /shots/*.png {
+		reverse_proxy analyzer:8001
+	}
+
+	handle {
+		respond "Tripwire" 404
+	}
+}

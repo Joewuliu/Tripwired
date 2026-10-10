@@ -1,0 +1,81 @@
+# docker compose up -d --build        (step by step in deploy/DEPLOY.md)
+#
+# Only Caddy publishes ports. The analyzer and gateway are reachable only on the private
+# "tripwire" network, and the analyzer (which opens hostile pages) holds no chat credentials.
+services:
+  analyzer:
+    build: ./analyzer
+    environment:
+      SAFE_BROWSING_API_KEY: ${SAFE_BROWSING_API_KEY:-}
+      URLHAUS_AUTH_KEY: ${URLHAUS_AUTH_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # The evaluation harness opens live phishing pages and refuses to run unless this is 1.
+      TRIPWIRE_EVAL_OK: ${TRIPWIRE_EVAL_OK:-0}
+    init: true # reaps stray browser processes
+    shm_size: "1gb" # Chromium crashes on the default 64 MB /dev/shm
+    mem_limit: 3g
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    volumes:
+      - ./data:/app/data
+    # Google Cloud's default resolver is the metadata address 169.254.169.254, which
+    # deploy/egress-firewall.sh blocks. Public resolvers are not in any blocked range.
+    dns: [1.1.1.1, 8.8.8.8]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      tripwire:
+        ipv4_address: 172.30.0.10 # the firewall rules name this address
+
+  gateway:
+    build: ./gateway
+    environment:
+      ANALYZER_URL: http://analyzer:8001
+      SPECTRUM_PROJECT_ID: ${SPECTRUM_PROJECT_ID:-}
+      SPECTRUM_PROJECT_SECRET: ${SPECTRUM_PROJECT_SECRET:-}
+    depends_on:
+      analyzer:
+        condition: service_healthy
+    restart: unless-stopped
+    dns: [1.1.1.1, 8.8.8.8]
+    networks:
+      tripwire:
+        ipv4_address: 172.30.0.11
+
+  caddy:
+    image: caddy:2-alpine
+    environment:
+      SITE_HOST: ${SITE_HOST:?set SITE_HOST in .env (see deploy/DEPLOY.md)}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data # the issued certificate lives here
+      - caddy_config:/config
+    depends_on:
+      analyzer:
+        condition: service_healthy
+    restart: unless-stopped
+    dns: [1.1.1.1, 8.8.8.8]
+    networks:
+      tripwire:
+        ipv4_address: 172.30.0.12
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  tripwire:
+    name: tripwire
+    driver: bridge
+    ipam:
+      config:
+        # Must match SUBNET in deploy/egress-firewall.sh
+        - subnet: 172.30.0.0/24
