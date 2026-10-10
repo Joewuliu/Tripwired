@@ -19,6 +19,7 @@ import re
 
 from netguard import UNRESOLVED
 
+_CONNECTION_DROPPED = ("ERR_HTTP2_PROTOCOL_ERROR", "ERR_CONNECTION_RESET", "ERR_CONNECTION_CLOSED", "ERR_EMPTY_RESPONSE")
 GONE_STATUSES = {404, 410}
 REFUSED_STATUSES = {401, 403, 429, 451, 503}
 SHORT_PAGE_CHARS = 700  # a wall of this kind is a short page; a long article that quotes one is not
@@ -49,6 +50,10 @@ def judge_access(opened: dict) -> dict | None:
             return {"kind": "unresolved", "detail": UNRESOLVED}
         if error.startswith("blocked:"):  # our own refusal: a private address or a non-web scheme
             return {"kind": "not_public", "detail": "not a public web address"}
+        if any(code in error for code in _CONNECTION_DROPPED):
+            # The server answered by cutting the connection: what sites with bot protection do to a
+            # browser they take for automated (pnc.com, usaa.com). It is there; it would not talk to us.
+            return {"kind": "refused", "detail": "it dropped the connection"}
         return {"kind": "unreachable", "detail": "no page arrived"}
     if status in GONE_STATUSES:
         return {"kind": "gone", "detail": f"HTTP {status}"}

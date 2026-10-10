@@ -1,6 +1,6 @@
 import pytest
 
-from enrich import registered_domain
+from enrich import rdap_domain, registered_domain
 from platforms import POPULAR_DOMAINS, is_free_host, is_popular, is_shared_host
 
 
@@ -34,6 +34,15 @@ def test_shared_hosts(host):
 def test_free_hosting_platforms_and_their_subdomains(host):
     assert is_free_host(host)
     assert not is_shared_host(host)
+
+
+@pytest.mark.parametrize("host", ["paypal-login.my.id", "tokoku.web.id", "shop.biz.id"])
+def test_a_cheap_registry_namespace_is_a_registered_domain_not_free_hosting(host):
+    """my.id is a public suffix in the ICANN list (like co.uk): each name under it is somebody's own
+    registered domain, with its own RDAP record and age. It must not be treated as a hosting platform."""
+    assert not is_free_host(host)
+    assert registered_domain(host) == host
+    assert rdap_domain(host) == host  # RDAP is asked about the name itself, so its age can be found
 
 
 @pytest.mark.parametrize(

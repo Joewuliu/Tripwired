@@ -79,6 +79,8 @@ def test_a_shared_host_is_judged_by_its_path_and_its_content():
     ("https://www.paypal.com/signin", "PayPal"),
     ("https://secure.chase.com", "Chase"),
     ("https://www.ezpassnj.com", "E-ZPass"),
+    # where txtag.org sends people today; its /discover/ path is not the card company
+    ("https://www.txdot.gov/discover/toll-roads-managed-lanes.html", "TxTag"),
     ("https://www.ncdot.gov", "NC DMV"),
     ("https://www.google.co.uk/", "Google"),
     ("https://www.youtube.com/", "Google"),

@@ -20,7 +20,7 @@
   {"brand": "DHL", "keywords": ["dhl"], "official_domains": ["dhl.com", "dhl.de", "dhl.co.uk", "dhl.fr", "dhl.es", "dhl.it", "dhl.nl", "dhl.com.au"], "verify": true},
   {"brand": "E-ZPass", "keywords": ["ezpass", "e-zpass", "quick pass", "quickpass"], "official_domains": ["e-zpassny.com", "e-zpassiag.com", "ncquickpass.com", "ezpassnj.com", "ezpassmd.com", "ezpassva.com"], "verify": true},
   {"brand": "SunPass", "keywords": ["sunpass"], "official_domains": ["sunpass.com"], "verify": true},
-  {"brand": "TxTag", "keywords": ["txtag"], "official_domains": ["txtag.org"], "verify": true},
+  {"brand": "TxTag", "keywords": ["txtag"], "official_domains": ["txtag.org", "txdot.gov"], "verify": true},
   {"brand": "Peach Pass", "keywords": ["peach pass", "peachpass"], "official_domains": ["peachpass.com"], "verify": true},
   {"brand": "NTTA", "keywords": ["ntta"], "official_domains": ["ntta.org"], "verify": true},
   {"brand": "NC DMV", "keywords": ["ncdmv", "nc dmv"], "official_domains": ["ncdot.gov"], "verify": true},

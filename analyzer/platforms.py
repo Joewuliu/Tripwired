@@ -15,6 +15,11 @@ SHARED_HOSTS = frozenset({
 
 # Free hosting, site builders and storage endpoints: a hostname equal to one of these, or under one,
 # is somebody's own page on a platform.
+#
+# Not for cheap registry namespaces such as my.id, web.id or biz.id (Indonesia): those are public
+# suffixes in the ICANN list, so name.my.id is a domain somebody registered. It has its own RDAP
+# record, and its age is exactly the evidence wanted for a throwaway domain; listing it here would
+# throw that away and score it as a page on someone else's platform.
 FREE_HOSTING_PLATFORMS = frozenset({
     # Cloudflare
     "pages.dev", "workers.dev", "r2.dev",

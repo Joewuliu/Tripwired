@@ -1,5 +1,9 @@
 import asyncio
+import gc
+import inspect
+import logging
 import socket
+import time
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
 from urllib.parse import urlparse
@@ -117,8 +121,134 @@ async def test_a_stalled_iframe_is_recorded_as_unread_not_as_having_no_form(allo
         result = await sandbox.open_page(f"http://127.0.0.1:{port}/", tmp_path / "s.png")
     assert result["loaded"] is True and "Welcome" in result["text"]
     assert result["sensitive_fields"] == []
-    # the frame had not started to load, so it has no address to name
-    assert result["read_errors"] == [{"what": "fields", "frame": ""}]
+    assert result["read_errors"] == [{"what": "fields", "frame": "127.0.0.1"}]  # named by where it comes from
+
+
+@pytest.mark.asyncio
+async def test_a_frame_still_arriving_is_unread_too(allow_only_loopback_ip, tmp_path):
+    """The frame's document started but stalled half way: a form further down was never seen."""
+    async def half_then_stall(reader, writer):
+        await reader.readline()
+        while (await reader.readline()).strip():
+            pass
+        writer.write(b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 5000\r\n\r\n<html><body><p>top of the frame</p>")
+        await writer.drain()
+        await asyncio.sleep(30)
+
+    slow = await asyncio.start_server(half_then_stall, "127.0.0.1", 0)
+    slow_port = slow.sockets[0].getsockname()[1]
+    try:
+        body = page(f'<h1>Welcome</h1><iframe src="http://127.0.0.1:{slow_port}/" width="300" height="200"></iframe>')
+        async with serve({"/": (200, HTML, body)}) as (port, _):
+            result = await sandbox.open_page(f"http://127.0.0.1:{port}/", tmp_path / "s.png")
+    finally:
+        slow.close()
+        slow.close_clients()
+    assert "Welcome" in result["text"]
+    assert {"what": "fields", "frame": "127.0.0.1"} in result["read_errors"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("style", [
+    'style="display:none"', 'width="1" height="1"', 'width="0" height="0"', 'style="visibility:hidden"',
+    'style="position:absolute;left:-9999px;width:2px;height:2px"',
+])
+async def test_a_hidden_or_pixel_sized_frame_is_neither_read_nor_missed(allow_only_loopback_ip, tmp_path, style):
+    """Advertising and tracking frames: real sites carry several, they are slow or blocked, and nobody
+    can type into one. Treating them as unread turned Amazon and Wells Fargo into 'couldn't check'."""
+    routes = {
+        "/": (200, HTML, page(f'<h1>Welcome</h1><iframe src="/slow" {style}></iframe><iframe src="/form" {style}></iframe>')),
+        "/slow": (200, HTML, None),  # never arrives
+        "/form": (200, HTML, page('<input type="password" name="pw">')),  # a form nobody can see
+    }
+    async with serve(routes) as (port, _):
+        result = await sandbox.open_page(f"http://127.0.0.1:{port}/", tmp_path / "s.png")
+    assert result["read_errors"] == []
+    assert result["sensitive_fields"] == []
+
+
+@pytest.mark.asyncio
+async def test_a_page_that_disables_eval_is_still_read(allow_only_loopback_ip, tmp_path):
+    """americanexpress.com does this. Playwright's evaluate relies on the page's eval, so the form scan
+    failed there every time; it now runs in a world the page cannot tamper with."""
+    body = page('<script>window.eval = () => { throw new Error("eval is disabled") }</script>'
+                '<h1>Log in</h1><input type="password" name="pw"><input name="cvv" placeholder="CVV">')
+    async with serve({"/": (200, HTML, body)}) as (port, _):
+        result = await sandbox.open_page(f"http://127.0.0.1:{port}/", tmp_path / "s.png")
+    assert [f["kind"] for f in result["sensitive_fields"]] == ["password", "card"]
+    assert result["read_errors"] == []
+    assert "Log in" in result["text"]
+
+
+@pytest.mark.asyncio
+async def test_a_read_that_fails_at_once_is_tried_again(tmp_path):
+    """A page navigating at the instant we ask throws its script context away; a moment later it reads."""
+    calls = {"text": 0}
+
+    async def text_after_a_hiccup(selector):
+        calls["text"] += 1
+        if calls["text"] == 1:
+            raise RuntimeError("Execution context was destroyed, most likely because of a navigation")
+        return "the page, read on the second try"
+
+    async def nothing(*args, **kwargs):
+        return None
+
+    async def no_fields(script):
+        return []
+
+    main_frame = SimpleNamespace(url="https://page.example/", evaluate=no_fields)
+    stub = SimpleNamespace(url="https://page.example/", screenshot=nothing, title=nothing, inner_text=text_after_a_hiccup,
+                           frames=[main_frame], main_frame=main_frame)
+    result = {"read_errors": [], "final_url": None}
+    await sandbox._read_page(stub, result, tmp_path / "s.png")
+    assert result["text"] == "the page, read on the second try"
+    assert result["read_errors"] == []
+    assert calls["text"] == 2
+
+
+@pytest.mark.asyncio
+async def test_a_read_that_keeps_failing_is_recorded_not_retried_forever(tmp_path):
+    calls = {"text": 0}
+
+    async def always_broken(selector):
+        calls["text"] += 1
+        raise RuntimeError("Execution context was destroyed")
+
+    async def nothing(*args, **kwargs):
+        return None
+
+    async def no_fields(script):
+        return []
+
+    main_frame = SimpleNamespace(url="https://page.example/", evaluate=no_fields)
+    stub = SimpleNamespace(url="https://page.example/", screenshot=nothing, title=nothing, inner_text=always_broken,
+                           frames=[main_frame], main_frame=main_frame)
+    result = {"read_errors": [], "final_url": None}
+    await sandbox._read_page(stub, result, tmp_path / "s.png")
+    assert calls["text"] == 2
+    assert {"what": "text", "frame": None} in result["read_errors"]
+
+
+@pytest.mark.asyncio
+async def test_an_empty_or_inline_frame_is_not_called_unread(allow_only_loopback_ip, tmp_path):
+    body = page('<h1>Hi</h1><iframe></iframe><iframe src="about:blank"></iframe>'
+                '<iframe srcdoc="<input type=password name=pw>" width="200" height="80"></iframe>')
+    async with serve({"/": (200, HTML, body)}) as (port, _):
+        result = await sandbox.open_page(f"http://127.0.0.1:{port}/", tmp_path / "s.png")
+    assert result["read_errors"] == []
+    assert [f["kind"] for f in result["sensitive_fields"]] == ["password"]  # the inline frame's form is read
+
+
+@pytest.mark.asyncio
+async def test_a_frame_we_refused_ourselves_is_blocked_not_unread(allow_only_loopback_ip, tmp_path):
+    async with serve({}) as (secret_port, secret_hits):
+        body = page(f'<h1>Hi</h1><iframe src="http://localhost:{secret_port}/admin"></iframe>')
+        async with serve({"/": (200, HTML, body)}) as (port, _):
+            result = await sandbox.open_page(f"http://127.0.0.1:{port}/", tmp_path / "s.png")
+    assert secret_hits == []
+    assert result["blocked_requests"] >= 1
+    assert result["read_errors"] == []
 
 
 @pytest.mark.asyncio
@@ -136,13 +266,51 @@ async def test_a_page_that_never_gives_the_thread_back_cannot_hold_a_browser_slo
     assert result["loaded"] is True
 
 
+def _leftover_task_reports(caplog) -> list[str]:
+    gc.collect()  # a pending task that was dropped is reported when it is collected
+    return [r.getMessage() for r in caplog.records if "Task was destroyed" in r.getMessage() or "never retrieved" in r.getMessage()]
+
+
+def test_the_sandbox_never_fetches_a_document_itself():
+    """route.fetch is Playwright's own HTTP client, not the browser. Sites with bot protection can
+    tell: some answer it 403 while serving the real browser (coinbase.com), others never answer it
+    (pnc.com), and a fetch still waiting when a scan ends leaves 'Task was destroyed but it is
+    pending' behind. Redirects are vetted at the response stage instead (see _install_guards)."""
+    source = inspect.getsource(sandbox)
+    code = "\n".join(line.split("#")[0] for line in source.splitlines() if not line.strip().startswith(('"""', "#")))
+    assert ".fetch(" not in code
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("body,stalled", [
+    ('<iframe src="/slow"></iframe><script src="/slow.js"></script><p>content</p>', ("/slow", "/slow.js")),
+    ("<p>x</p><script>setTimeout(() => { const t = Date.now(); while (Date.now() - t < 30000); }, 200)</script>", ()),
+    ("".join(f'<img src="/img{i}.png">' for i in range(12)) + "<p>content</p>", tuple(f"/img{i}.png" for i in range(12))),
+])
+async def test_a_scan_that_ends_with_work_in_flight_ends_quietly(monkeypatch, tmp_path, caplog, body, stalled):
+    """Requests still arriving, and checks still running, when a scan ends: nothing is left pending
+    and teardown is not reported as if requests had failed."""
+    def slow_lookup(url):
+        time.sleep(0.3)  # runs in a worker thread, like a real DNS lookup
+        return urlparse(url).hostname == "127.0.0.1"
+
+    monkeypatch.setattr(sandbox, "is_public", slow_lookup)
+    caplog.set_level(logging.DEBUG)
+    routes = {"/": (200, HTML, page(body)), **{path: (200, HTML, None) for path in stalled}}
+    async with serve(routes) as (port, _):
+        await sandbox.open_page(f"http://127.0.0.1:{port}/", tmp_path / "s.png")
+    await asyncio.sleep(0.6)  # let anything the scan left behind show itself
+    assert _leftover_task_reports(caplog) == []
+    assert [r.getMessage() for r in caplog.records if "ended early" in r.getMessage()] == []
+
+
 @pytest.mark.asyncio
 async def test_reads_are_made_together_so_stalls_do_not_add_up(tmp_path):
     """Four reads that each hang cost one timeout, not four."""
     async def hang(*args, **kwargs):
         await asyncio.sleep(30)
 
-    frame = SimpleNamespace(url="https://frame.example/x", evaluate=hang)
+    frame = SimpleNamespace(url="https://frame.example/x", evaluate=hang, frame_element=hang)
     main_frame = SimpleNamespace(url="https://page.example/", evaluate=hang)
     page_stub = SimpleNamespace(url="https://page.example/", screenshot=hang, title=hang, inner_text=hang,
                                 frames=[main_frame, frame], main_frame=main_frame)
@@ -264,10 +432,13 @@ async def test_a_page_that_redirects_itself_after_loading_is_followed_and_still_
         async with serve(routes) as (port, _):
             result = await sandbox.open_page(f"http://127.0.0.1:{port}/", tmp_path / "s.png")
     assert secret_hits == [], "the private address was contacted"
-    assert "the real page" in result["text"]
-    assert result["final_url"].endswith("/landed")
-    assert [hop["status"] for hop in result["redirects"]] == [200, 302, 200, 302]
     assert result["blocked_requests"] >= 1
+    assert [hop["url"].rsplit("/", 1)[-1] for hop in result["redirects"]][:3] == ["", "go", "landed"]  # the public part was followed
+    # Stopping the browser there leaves it on its own error page, so there is no page of the site's to
+    # read: the scan says so instead of describing an error page.
+    assert result["loaded"] is False
+    assert result["error"] == "blocked: not a public address"
+    assert result["text"] == "" and result["has_screenshot"] is False
 
 
 @pytest.mark.asyncio

@@ -37,6 +37,13 @@ def test_other_failures_to_load_are_unreachable(error):
     assert kind(loaded=False, error=error) == "unreachable"
 
 
+@pytest.mark.parametrize("code", ["ERR_HTTP2_PROTOCOL_ERROR", "ERR_CONNECTION_RESET", "ERR_CONNECTION_CLOSED", "ERR_EMPTY_RESPONSE"])
+def test_a_site_that_cuts_the_connection_refused_us(code):
+    """What pnc.com does to a browser it takes for automated: the site is there, it would not talk to us."""
+    result = judge_access(page(loaded=False, error=f"Page.goto: net::{code} at https://www.bank.example/"))
+    assert result == {"kind": "refused", "detail": "it dropped the connection"}
+
+
 @pytest.mark.parametrize("status", [404, 410])
 def test_gone(status):
     result = judge_access(page(final_status=status, title="Not found", text="Nothing here"))
