@@ -12,7 +12,7 @@ BY_NAME = {b["brand"]: b for b in BRANDS}
 MUST_HAVE = [
     "Chase", "Bank of America", "Wells Fargo", "Capital One", "USPS", "UPS", "FedEx", "DHL", "E-ZPass",
     "NC DMV", "IRS", "Apple", "Microsoft", "Google", "Amazon", "Netflix", "PayPal", "Venmo", "Zelle",
-    "Coinbase", "Facebook", "Instagram", "WhatsApp", "Steam", "Roblox",
+    "Coinbase", "Facebook", "Instagram", "WhatsApp", "Steam", "Roblox", "Ledger", "Trezor",
 ]
 
 
@@ -24,8 +24,9 @@ def test_the_list_is_big_enough_and_every_brand_is_unique():
 
 def test_entries_are_well_formed():
     for brand in BRANDS:
-        assert set(brand) <= {"brand", "keywords", "official_domains", "verify"}, brand["brand"]
+        assert set(brand) <= {"brand", "keywords", "address_keywords", "official_domains", "verify"}, brand["brand"]
         assert brand["keywords"] and all(k == k.lower() and k.strip() for k in brand["keywords"]), brand["brand"]
+        assert all(k == k.lower() and k.strip() for k in brand.get("address_keywords", [])), brand["brand"]
         assert brand["official_domains"], brand["brand"]
         assert brand.get("verify", True) is True
 

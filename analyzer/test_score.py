@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from brands import check_brand
 from score import DANGEROUS_AT, RULES, SUSPICIOUS_AT, WEIGHTS, judge
 
 CLEAR = [{"source": s, "status": "clear"} for s in ("Google Safe Browsing", "URLhaus", "OpenPhish")]
@@ -108,6 +109,80 @@ def test_a_brand_only_mentioned_in_the_text_still_builds_up_with_a_form():
     result = judge(scan(brand=[brand("mention", "PayPal", '"paypal" in title')], fields=[field("password")]))
     assert result.score == 10 + 25
     assert result.verdict == "suspicious"
+
+
+# --- a brand named only in the URL path --------------------------------------------------------
+
+def at(url, **overrides):
+    """A scan of a real-looking address, with the real brand matcher's findings."""
+    return scan(final_url=url, brand=check_brand(url), **overrides)
+
+
+@pytest.mark.parametrize("url,brand", [
+    ("https://some-small-shop.top/discover", "Discover"),  # a perfectly ordinary section of a site
+    ("https://some-small-shop.top/discover/toll-roads", "Discover"),  # txdot.gov did exactly this
+    ("https://some-small-shop.top/apple", "Apple"),
+    ("https://some-small-shop.top/medicare/plans", "Medicare"),
+    ("https://some-small-shop.top/shop/facebook-ads-guide", "Facebook"),
+])
+def test_a_brand_only_in_the_path_is_worth_nothing_by_itself(url, brand):
+    found = check_brand(url)
+    assert {"type": "impersonation", "brand": brand, "detail": found[0]["detail"]} in found  # the matcher still sees it
+    result = judge(at(url))
+    assert (result.verdict, result.score) == ("no_red_flags", 0)
+    path = next(e for e in result.evidence if e.id == "impersonation_path")
+    assert path.points == 0
+    assert "not counted without a form" in path.label  # the report says why it is shown and not scored
+
+
+def test_a_brand_in_the_path_with_a_login_form_is_a_phish():
+    url = "https://some-small-shop.top/paypal/login"
+    result = judge(at(url, fields=[field("password")]))
+    assert result.verdict == "dangerous"
+    assert {"impersonation_path": 35, "sensitive_fields": 10, "brand_with_sensitive_fields": 25} == {
+        e.id: e.points for e in result.evidence if e.points
+    }
+
+
+def test_a_brand_in_the_path_on_a_young_domain_counts():
+    url = "https://some-small-shop.top/chase/secure"
+    assert judge(at(url, age={**OLD, "age_days": 5})).verdict == "dangerous"  # 35 + 30
+    young = judge(at(url, age={**OLD, "age_days": 20}))  # 35 + 20
+    assert (young.verdict, young.score) == ("suspicious", 55)
+    assert judge(at(url, age={**OLD, "age_days": 400})).score == 0  # an established domain: nothing
+
+
+def test_a_brand_in_the_path_counts_next_to_another_non_path_signal():
+    url = "https://some-small-shop.top/chase/secure"
+    assert judge(at(url, feeds=[listed()])).score == 60 + 35
+    assert judge(at(url, warning="Cloudflare phishing warning")).score == 60 + 35
+    imitates = scan(final_url=url, brand=[*check_brand(url), brand("lookalike", "PayPal", "x")])
+    assert judge(imitates).score == 25 + 35
+
+
+def test_a_refusal_or_a_free_host_is_not_enough_to_count_a_path():
+    url = "https://some-small-shop.top/chase/secure"
+    refused = judge(at(url, access={"kind": "refused", "detail": "HTTP 403"}))
+    assert (refused.verdict, refused.score) == ("couldnt_check", 10)  # the +10 for refusing, none for the path
+    free = judge(at("https://someone.netlify.app/paypal"))
+    assert (free.verdict, free.score) == ("no_red_flags", 0)
+
+
+def test_a_name_in_both_the_domain_and_the_path_is_one_finding():
+    url = "https://chase-secure.top/chase/login"
+    result = judge(at(url))
+    assert result.score == 35  # not 70
+    assert [e.id for e in result.evidence if e.id.startswith("impersonation")] == ["impersonation"]
+
+    # and if a matcher ever reported both, the second still adds nothing
+    both = scan(final_url=url, brand=[brand("impersonation", "Chase", '"chase" in domain'),
+                                      brand("impersonation", "Chase", '"chase" in path')])
+    assert judge(both).score == 35
+
+
+def test_the_points_table_lists_the_path_rule():
+    rule = next(r for r in judge(scan()).points_table if r.id == "impersonation_path")
+    assert rule.points == 35 and "form" in rule.label
 
 
 def test_a_mention_alone_is_worth_nothing():

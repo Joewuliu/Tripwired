@@ -11,6 +11,9 @@ from pathlib import Path
 SHARED_HOSTS = frozenset({
     "docs.google.com", "drive.google.com", "sites.google.com", "forms.gle", "storage.googleapis.com",
     "bit.ly", "t.co", "tinyurl.com", "goo.gl", "is.gd", "ow.ly", "rb.gy", "cutt.ly", "lnkd.in",
+    # link-in-bio pages, shared files and form builders: one host, many people's pages (by path)
+    "linktr.ee", "bio.link", "beacons.ai", "forms.office.com", "onedrive.live.com", "1drv.ms", "page.link",
+    "form.jotform.com",
 })
 
 # Free hosting, site builders and storage endpoints: a hostname equal to one of these, or under one,
@@ -31,11 +34,37 @@ FREE_HOSTING_PLATFORMS = frozenset({
     # site builders
     "weebly.com", "wixsite.com", "000webhostapp.com", "blogspot.com", "notion.site", "carrd.co",
     "tiiny.site", "mystrikingly.com", "canva.site",
+    "square.site", "squarespace.com", "myshopify.com", "wixstudio.io", "editorx.io", "wordpress.com",
+    "wpcomstaging.com", "site123.me", "jimdosite.com", "jimdofree.com", "weeblysite.com", "webnode.page",
+    "webnode.com", "strikingly.com", "gitbook.io",
+    # app hosts, free web hosting and tunnels
+    "azurewebsites.net", "railway.app", "deno.dev", "pythonanywhere.com", "infinityfreeapp.com", "epizy.com",
+    "ngrok-free.app", "ngrok.app", "ngrok.io", "trycloudflare.com", "loca.lt",
     # storage, CDN and file-sharing endpoints
     "backblazeb2.com", "storage.googleapis.com", "googleusercontent.com", "dropboxusercontent.com",
     "cloudfront.net", "amazonaws.com", "ipfs.io", "dweb.link",
+    "blob.core.windows.net", "web.core.windows.net", "digitaloceanspaces.com", "firebasestorage.googleapis.com",
+    "sharepoint.com",
 })
 
+
+# Advertising, analytics, consent and chat-widget infrastructure. A visible embedded frame from one of
+# these that is still loading when a page is read is not counted as "could not read": they are the
+# slow frames on nearly every large commercial site, and none of them is where a site puts its own
+# login or payment form. Kept short and to vendors that serve widgets, never user content: a form
+# builder, a file host or a site builder does not belong here. Matched on the host and its subdomains.
+NON_FORM_FRAME_HOSTS = frozenset({
+    # advertising and measurement
+    "doubleclick.net", "googlesyndication.com", "googleadservices.com", "googletagmanager.com",
+    "google-analytics.com", "adsrvr.org", "amazon-adsystem.com", "criteo.com", "criteo.net", "taboola.com",
+    "outbrain.com", "scorecardresearch.com", "quantserve.com", "everesttech.net", "demdex.net", "omtrdc.net",
+    "adobedtm.com", "tiqcdn.com", "tealiumiq.com", "hotjar.com", "clarity.ms", "fullstory.com", "newrelic.com",
+    # consent banners
+    "onetrust.com", "cookielaw.org", "trustarc.com", "consensu.org",
+    # chat widgets
+    "pure.cloud", "us-gov-pure.cloud", "mypurecloud.com", "genesys.com", "intercom.io", "intercomcdn.com", "drift.com", "driftt.com", "livechatinc.com",
+    "zdassets.com", "salesforceliveagent.com", "my.salesforce-sites.com",
+})
 
 POPULAR_DOMAINS_PATH = Path(__file__).resolve().parent / "data" / "popular_domains.txt"
 
@@ -64,6 +93,12 @@ def is_free_host(hostname: str) -> bool:
         return True
     labels = host.split(".")
     return any(".".join(labels[i:]) in FREE_HOSTING_PLATFORMS for i in range(len(labels)))
+
+
+def is_non_form_frame_host(hostname: str) -> bool:
+    """True for a host (or a subdomain of one) in NON_FORM_FRAME_HOSTS: ad, analytics, consent or chat."""
+    labels = _clean(hostname).split(".")
+    return any(".".join(labels[i:]) in NON_FORM_FRAME_HOSTS for i in range(len(labels)))
 
 
 def is_popular(hostname: str, registered: str) -> bool:

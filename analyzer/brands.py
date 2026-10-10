@@ -118,7 +118,10 @@ def _in_host(keyword: str, host: str, label: str) -> bool:
 def _address_finding(brand: dict, subject: dict) -> dict | None:
     """impersonation (the name itself) beats lookalike (the name disguised)."""
     host, path = subject["match_host"], subject["path_words"]
-    for keyword in brand["keywords"]:
+    # address_keywords are names too common in ordinary text to count in a page ("ledger" is also an
+    # accounting book), but telling in a web address.
+    keywords = [*brand["keywords"], *brand.get("address_keywords", [])]
+    for keyword in keywords:
         if host and _in_host(keyword, host, subject["label"]):
             return {"type": "impersonation", "brand": brand["brand"], "detail": f'"{keyword}" in domain'}
         if _words(keyword) in path:
@@ -127,7 +130,7 @@ def _address_finding(brand: dict, subject: dict) -> dict | None:
         return None
     # Look-alike checks need a name long enough to be unambiguous: "55a.com" is not "ssa", and
     # "upss.com" is not a disguised "ups".
-    for keyword in brand["keywords"]:  # the same check once the characters are un-disguised
+    for keyword in keywords:  # the same check once the characters are un-disguised
         if len(_squash(keyword)) >= MIN_LABEL and _in_host(keyword, subject["plain_host"], subject["plain_label"]):
             return {"type": "lookalike", "brand": brand["brand"],
                     "detail": f'{subject["host"]} spells "{keyword}" with look-alike characters'}

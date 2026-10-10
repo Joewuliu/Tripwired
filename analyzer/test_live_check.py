@@ -99,6 +99,16 @@ def test_summary_counts_misses_and_false_alarms_separately():
     assert "1 said no red flags (MISSED)" in text
 
 
+def test_summary_counts_scans_a_person_would_have_given_up_on():
+    rows = [{**row("benign", "no_red_flags"), "seconds": 4.0}, {**row("benign", "no_red_flags"), "seconds": 19.5}]
+    assert "1 of 2 took longer than 15 seconds" in "\n".join(summary(rows))
+    assert "longer than 15" not in "\n".join(summary([row("phish", "dangerous")]))
+
+
+def test_the_check_runs_as_many_at_once_as_the_sandbox_allows():
+    assert live_check.CONCURRENCY == live_check.sandbox.MAX_CONCURRENT
+
+
 def test_summary_says_how_often_a_page_could_not_be_fully_read():
     rows = [row("phish", "dangerous"), {**row("benign", "couldnt_check"), "unread": True},
             {**row("benign", "no_red_flags"), "unread": False}]

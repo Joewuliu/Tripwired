@@ -11,6 +11,7 @@ subresources (only their first address is checked).
 """
 import asyncio
 import logging
+import os
 import time
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit
@@ -20,8 +21,21 @@ from playwright.async_api import async_playwright
 
 from forms import READ_FIELDS_JS, sensitive_fields
 from netguard import NOT_PUBLIC, is_public, refusal_reason
+from platforms import is_non_form_frame_host
 
-MAX_CONCURRENT = 3
+def _browsers_from_env(default: int = 3, ceiling: int = 6) -> int:
+    """How many browsers may run at once: TRIPWIRE_BROWSERS, 1 to 6. Anything else is the default.
+    On a small VM the browsers compete for one sustained CPU, so fewer can finish sooner."""
+    try:
+        value = int(os.environ.get("TRIPWIRE_BROWSERS", ""))
+    except ValueError:
+        return default
+    return value if 1 <= value <= ceiling else default
+
+
+MAX_CONCURRENT = _browsers_from_env()
+FRAME_WAIT_S = 2.5  # a visible frame that is still loading when read is given this long (see _frame_fields)
+FRAME_POLL_S = 0.25
 MAX_FRAMES = 16  # frames beyond this are not read; pages with that many are almost always advertising
 MIN_FRAME_WIDTH, MIN_FRAME_HEIGHT = 60, 20  # css px; an embedded frame smaller than a text box holds no form
 MAX_REDIRECTS = 10
@@ -75,6 +89,15 @@ async def _install_guards(ctx, page, result: dict, guard: dict) -> None:
 
     async def check_request(route) -> None:
         request = route.request
+        if guard["closing"]:
+            # The scan is over and the browser is going away. A request that arrives now is refused
+            # on the spot: checking it would start work nobody is left to finish, and letting it
+            # through is not an option.
+            try:
+                await route.abort()
+            except Exception:
+                pass
+            return
         this = asyncio.current_task()  # Playwright's task for this request; ended by _close if still running
         guard["tasks"].add(this)
         try:
@@ -133,6 +156,8 @@ async def _install_guards(ctx, page, result: dict, guard: dict) -> None:
                 pass
 
     def on_paused(paused: dict) -> None:
+        if guard["closing"]:
+            return  # the browser is being closed; nothing is left to vet, and no new work is started
         task = asyncio.ensure_future(check_response(paused))
         guard["tasks"].add(task)
         task.add_done_callback(guard["tasks"].discard)
@@ -206,10 +231,42 @@ async def _in_isolated_world(guard: dict, function_source: str):
     return answer["result"].get("value")
 
 
+async def _holds_something_to_type_into(element) -> bool:
+    """False for a frame that is hidden or pixel-sized: advertising and tracking frames, and chat
+    widgets before the site's script styles them away. Nobody can type into one."""
+    if not await element.is_visible():
+        return False
+    box = await element.bounding_box()
+    return bool(box) and box["width"] >= MIN_FRAME_WIDTH and box["height"] >= MIN_FRAME_HEIGHT
+
+
+async def _frame_now(page, frame, element) -> tuple[bool, list[dict], str]:
+    """One look at an embedded frame: (loaded, its fields, where it comes from).
+
+    A frame that has not loaded still answers, from an empty placeholder document, so "no fields"
+    from such a frame means nothing and must not be passed on as "no form".
+    """
+    if not _is_web_page(frame.url):  # nothing has arrived in it yet: what is it meant to show?
+        src = await element.get_attribute("src") or ""
+        target = urljoin(page.url, src) if src else ""
+        # A frame we refused ourselves (a private address) is blocked, not unread.
+        if _is_web_page(target) and await asyncio.to_thread(is_public, target):
+            return False, [], _host(target)
+        return True, await frame.evaluate(READ_FIELDS_JS), ""  # about:blank, srcdoc and the like
+    fields = await frame.evaluate(READ_FIELDS_JS)
+    state = await frame.evaluate("() => document.readyState")
+    return state != "loading", fields, _host(frame.url)
+
+
 async def _frame_fields(page, frame, guard: dict | None = None) -> list[dict]:
-    """The frame's visible input fields. Raises _FrameNotRead for an embedded frame that has not
-    loaded: asking such a frame still "works" (it answers from an empty placeholder document), so
-    without this a login form in a slow frame would read as no form at all."""
+    """The input fields of one frame. Raises _FrameNotRead for a visible embedded frame that never
+    loaded, because a login form in it would otherwise read as no form at all.
+
+    A visible frame that is still loading is given FRAME_WAIT_S to finish, or to be hidden by the
+    page's own script: on a slow machine that is what most "slow frames" are. The frame is never
+    excused for being slow; only for being something nobody can type into, or (once the wait is over)
+    for coming from advertising, analytics, consent or chat infrastructure.
+    """
     if frame == page.main_frame:
         try:
             return await frame.evaluate(READ_FIELDS_JS)
@@ -219,23 +276,22 @@ async def _frame_fields(page, frame, guard: dict | None = None) -> list[dict]:
             if not guard or not guard.get("cdp"):
                 raise
             return await _in_isolated_world(guard, READ_FIELDS_JS) or []
+
     element = await frame.frame_element()
-    box = await element.bounding_box() if await element.is_visible() else None
-    if not box or box["width"] < MIN_FRAME_WIDTH or box["height"] < MIN_FRAME_HEIGHT:
-        # Hidden or pixel-sized: advertising and tracking frames. Nobody can type into one, so it is
-        # neither read nor missed (real pages carry several, and they are often slow or blocked).
+    loop = asyncio.get_running_loop()
+    give_up = loop.time() + FRAME_WAIT_S
+    while True:
+        if not await _holds_something_to_type_into(element):
+            return []
+        loaded, fields, host = await _frame_now(page, frame, element)
+        if loaded:
+            return fields
+        if loop.time() >= give_up:
+            break
+        await asyncio.sleep(FRAME_POLL_S)
+    if host and is_non_form_frame_host(host):
         return []
-    if not _is_web_page(frame.url):  # nothing has arrived in it yet: what is it meant to show?
-        src = await element.get_attribute("src") or ""
-        target = urljoin(page.url, src) if src else ""
-        # A frame we refused ourselves (a private address) is blocked, not unread.
-        if _is_web_page(target) and await asyncio.to_thread(is_public, target):
-            raise _FrameNotRead(_host(target))
-        return await frame.evaluate(READ_FIELDS_JS)  # about:blank, srcdoc and the like
-    fields = await frame.evaluate(READ_FIELDS_JS)
-    if await frame.evaluate("() => document.readyState") == "loading":
-        raise _FrameNotRead(_host(frame.url))  # still arriving: a form further down has not been seen
-    return fields
+    raise _FrameNotRead(host)
 
 
 async def _read_page(page, result: dict, shot_path: Path, guard: dict | None = None) -> None:
@@ -290,6 +346,15 @@ async def _read_page(page, result: dict, shot_path: Path, guard: dict | None = N
     result["sensitive_fields"] = sensitive_fields([field for fields in per_frame for field in fields or []])
 
 
+async def _end_checks(guard: dict) -> None:
+    """Cancel every request and response check still running, and wait for them to finish."""
+    in_flight = list(guard["tasks"])
+    for task in in_flight:
+        task.cancel()
+    if in_flight:
+        await asyncio.wait(in_flight, timeout=END_CHECKS_S)
+
+
 async def _close(browser, guard: dict) -> None:
     """Throw the browser away without waiting on the page, and leave no work behind.
 
@@ -301,18 +366,15 @@ async def _close(browser, guard: dict) -> None:
     # Checks still in flight (a DNS lookup, a paused response) have nothing left to protect. End them
     # here: a task still waiting when the driver shuts down is never resumed, and Python reports it
     # as "Task was destroyed but it is pending".
-    guard["closing"] = True
-    in_flight = list(guard["tasks"])
-    for task in in_flight:
-        task.cancel()
-    if in_flight:
-        await asyncio.wait(in_flight, timeout=END_CHECKS_S)
+    guard["closing"] = True  # from here a new request is refused at once and starts no work
+    await _end_checks(guard)
     # No unroute_all here: it waits on the page, and giving up on it part way leaves its own task
     # pending. The checks are already ended above, which is all it was for.
     try:
         await asyncio.wait_for(browser.close(), CLOSE_TIMEOUT_S)
     except Exception as exc:
         log.warning("closing the browser failed (%s); the driver will end it", type(exc).__name__)
+    await _end_checks(guard)  # anything that slipped in while the browser was closing
 
 
 async def open_page(url: str, shot_path: Path) -> dict:

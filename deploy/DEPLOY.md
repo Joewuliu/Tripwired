@@ -462,6 +462,21 @@ How to read it:
   are the two numbers that matter. Paste either section to whoever is tuning the scoring.
 - Add `--seed 7` to repeat exactly the same sample. Screenshots land in `data/live/<timestamp>/`.
 
+**If the log shows `read of screenshot failed after 4.0s`:** the browsers are competing for the VM's
+CPU (an `e2-medium` has one sustained vCPU shared by everything). Count them, then try fewer browsers
+at once and run the same sample again:
+
+```bash
+docker compose logs analyzer | grep -c "read of screenshot failed"
+sed -i 's/^TRIPWIRE_BROWSERS=.*/TRIPWIRE_BROWSERS=2/' .env
+docker compose up -d
+docker compose exec analyzer python live_check.py --phish 5 --benign 5 --seed 3270563943
+```
+
+`live_check` prints how many browsers it used and how many scans took over 15 seconds, so two runs
+with the same `--seed` compare directly. A single scan from a phone has the VM to itself, so it needs
+this far less than the check does.
+
 To forward live scams from your phone instead, print five fresh links (they are **not** defanged:
 paste them into the Tripwire chat, never open them):
 

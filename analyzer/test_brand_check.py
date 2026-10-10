@@ -73,6 +73,35 @@ def test_a_shared_host_is_judged_by_its_path_and_its_content():
     assert ("mention", "PayPal") in kinds("https://docs.google.com/forms/x", title="PayPal login")
 
 
+@pytest.mark.parametrize("url,brand", [
+    ("https://visit-ledgr-helps.square.site/", "Ledger"),  # the one the VM check reported with square.site's own age
+    ("https://ledger-live-support.top/recover", "Ledger"),
+    ("https://ledger-recover-wallet.com/", "Ledger"),  # bare "ledger" counts in an address
+    ("https://ledgerlive-app.net/", "Ledger"),
+    ("https://trezorio-xearn.gitbook.io/start", "Trezor"),  # from OpenPhish's list: a gitbook page
+    ("https://trezor-suite-login.com/", "Trezor"),
+    ("https://trezor.io.account-verify.top/", "Trezor"),
+])
+def test_hardware_wallet_scams_are_recognised_by_address(url, brand):
+    assert ("impersonation", brand) in kinds(url)
+
+
+def test_the_real_wallet_sites_are_official():
+    assert kinds("https://www.ledger.com/") == {("official", "Ledger")}
+    assert kinds("https://suite.trezor.io/") == {("official", "Trezor")}
+
+
+def test_the_word_ledger_in_ordinary_text_is_not_a_brand_mention():
+    """Accounting pages say 'general ledger'. The bare word counts in an address, never in page text."""
+    assert kinds("https://some-small-shop.top/", title="General ledger software", text="Post to the ledger") == set()
+    assert ("mention", "Ledger") in kinds("https://some-small-shop.top/", text="Open Ledger Live to continue")
+
+
+def test_a_ledger_misspelling_is_caught_by_address_even_without_the_real_word():
+    assert ("impersonation", "Ledger") in kinds("https://ledgr.com/")  # "ledgr" is a name only scams use
+    assert ("lookalike", "Ledger") in kinds("https://1edger-support.top/")  # a digit one for the l
+
+
 # --- official sites --------------------------------------------------------------------------
 
 @pytest.mark.parametrize("url,brand", [

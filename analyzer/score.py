@@ -25,6 +25,7 @@ RULES: list[tuple[str, str, int]] = [
     ("known_threat_feed", "Listed as malicious by a threat feed (counted once)", 60),
     ("platform_warning", "The hosting provider or browser vendor has flagged the page as dangerous", 60),
     ("impersonation", "Names a brand on a domain that is not the brand's", 35),
+    ("impersonation_path", "Names a brand only in the address path, together with a form, a young domain or another signal", 35),
     ("domain_under_7_days", "Domain registered under 7 days ago", 30),
     ("free_host_credentials", "Asks for sensitive details on a free hosting platform", 30),
     ("lookalike", "Lookalike domain (paypa1, chasee)", 25),
@@ -171,21 +172,41 @@ def _brands(findings: list[dict], official: bool) -> list[Evidence]:
         items.append(_item("official_domain", f"Registered domain is official for {_names(owners)} (brand list)", "Brand list", 0))
     if official:
         return items + _mentions(named("mention"))
-    in_domain, in_path = named("impersonation", "in domain"), named("impersonation", "in path")
-    if in_domain:
+    in_domain = named("impersonation", "in domain")
+    if in_domain:  # a brand named in the path alone is handled by _path_evidence, once the rest is known
         items.append(_item("impersonation", f"Web address uses the name {_names(in_domain)} but is not an official site (brand list)", "Brand list"))
-    if in_path:  # the points count once: a name in the domain and in the path is still one finding
-        items.append(_item(
-            "impersonation_path",
-            f"Web address path names {_names(in_path)}, but this is not an official site (brand list)", "Brand list",
-            0 if in_domain else WEIGHTS["impersonation"],
-        ))
     lookalikes = [f for f in findings if f["type"] == "lookalike"]
     for i, finding in enumerate(lookalikes):
         label = f"Domain imitates {finding['brand']}: {defang_text(finding['detail'])} (look-alike check)"
         items.append(_item("lookalike" if i == 0 else f"lookalike:{finding['brand']}", label, "Look-alike check",
                            WEIGHTS["lookalike"] if i == 0 else 0))
     return items + _mentions(named("mention"))
+
+
+# Signals that make a brand's name in the URL path worth points. A path on its own is weak: honest
+# sites have /discover, /apple, /medicare, /facebook, and the name says nothing about who runs the
+# site. Next to something that already points the same way it is evidence. Deliberately not here:
+# hides_from_sandbox (refused alone is weak), a free host with nothing else, or a mention.
+_CORROBORATES_PATH = frozenset({
+    "known_threat_feed", "platform_warning", "lookalike", "sensitive_fields", "brand_with_sensitive_fields",
+    "young_with_sensitive_fields", "free_host_credentials", "domain_under_7_days", "domain_under_30_days",
+})
+
+
+def _path_evidence(findings: list[dict], official: bool, so_far: list[Evidence]) -> list[Evidence]:
+    """A brand named only in the URL path: 0 points alone, full points with a corroborating signal."""
+    in_path = [f["brand"] for f in findings if f["type"] == "impersonation" and f["detail"].endswith("in path")]
+    if official or not in_path:
+        return []
+    names = _names(list(dict.fromkeys(in_path)))
+    if any(e.id == "impersonation" for e in so_far):  # already named in the domain: one finding, one set of points
+        return [_item("impersonation_path", f"Web address path also names {names} (brand list)", "Brand list", 0)]
+    if any(e.id in _CORROBORATES_PATH and e.points > 0 for e in so_far):
+        return [_item("impersonation_path",
+                      f"Web address path names {names}, but this is not an official site (brand list)", "Brand list")]
+    return [_item("impersonation_path",
+                  f"Web address path names {names}; not counted without a form, a young domain or another signal (brand list)",
+                  "Brand list", 0)]
 
 
 def _mentions(brands: list[str]) -> list[Evidence]:
@@ -259,6 +280,7 @@ def judge(scan) -> Judgement:
         + _fields(scan.fields, list(dict.fromkeys(named)), age_days, is_free_host(host), official)
         + _age(scan.age or {})
     )
+    items += _path_evidence(scan.brand, official, items)  # needs the rest, to see what corroborates it
     # An official domain is discounted only when nothing serious points the other way.
     serious = listed or bool(scan.warning)
     items = [

@@ -18,7 +18,7 @@ function appliedRules(report: Report): Set<string> {
   const applied = new Set<string>()
   for (const item of report.evidence) {
     if (item.points === 0) continue
-    applied.add(item.id.startsWith('impersonation') ? 'impersonation' : item.id.split(':')[0])
+    applied.add(item.id.split(':')[0])
   }
   return applied
 }

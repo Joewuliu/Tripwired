@@ -22,12 +22,13 @@ from datetime import datetime
 from pathlib import Path
 
 import feeds
+import sandbox
 from defang import defang
 from env import load_root_env
 from pipeline import scan
 from score import judge
 
-CONCURRENCY = 3
+CONCURRENCY = sandbox.MAX_CONCURRENT  # one gate here and the same count in the sandbox: no hidden queue
 BENIGN_PATH = Path(__file__).resolve().parent / "data" / "benign.txt"
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 FLAGGED = {"dangerous", "suspicious"}
@@ -84,6 +85,9 @@ def summary(rows: list[dict]) -> list[str]:
         f"  {benign['flagged']} flagged (FALSE ALARMS), {benign['clear']} no red flags, "
         f"{benign['undecided']} couldn't check",
     ]
+    slow = [r for r in rows if r.get("seconds", 0) > 15]
+    if slow:  # a scan this slow is one the person waiting would have given up on
+        lines.append(f"{len(slow)} of {len(rows)} took longer than 15 seconds")
     unread = [r for r in rows if r.get("unread")]
     if unread:  # a page we could not fully read is never cleared; this says how often that happens
         lines.append(
@@ -164,7 +168,8 @@ async def _main(args: argparse.Namespace) -> None:
     phish, benign = sample(pool, args.phish, rng), sample(load_urls(BENIGN_PATH), args.benign, rng)
     shots = DATA_DIR / "live" / f"{datetime.now():%Y%m%d-%H%M%S}-{secrets.token_hex(2)}"
     shots.mkdir(parents=True)
-    print(f"Checking {len(phish)} phishing and {len(benign)} known-good links (seed {args.seed}).\n", file=sys.stderr)
+    print(f"Checking {len(phish)} phishing and {len(benign)} known-good links (seed {args.seed}, "
+          f"{CONCURRENCY} browsers at a time).\n", file=sys.stderr)
     rows = await run(phish, benign, shots)
 
     print()

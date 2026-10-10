@@ -67,6 +67,11 @@
       "points": 35
     },
     {
+      "id": "impersonation_path",
+      "label": "Names a brand only in the address path, together with a form, a young domain or another signal",
+      "points": 35
+    },
+    {
       "id": "domain_under_7_days",
       "label": "Domain registered under 7 days ago",
       "points": 30

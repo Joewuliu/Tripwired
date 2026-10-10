@@ -11,6 +11,8 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       # The evaluation harness opens live phishing pages and refuses to run unless this is 1.
       TRIPWIRE_EVAL_OK: ${TRIPWIRE_EVAL_OK:-0}
+      # Browsers running at once (1 to 6). They share the VM's CPU: fewer can finish sooner.
+      TRIPWIRE_BROWSERS: ${TRIPWIRE_BROWSERS:-3}
     init: true # reaps stray browser processes
     shm_size: "1gb" # Chromium crashes on the default 64 MB /dev/shm
     mem_limit: 3g

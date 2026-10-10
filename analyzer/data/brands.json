@@ -42,6 +42,8 @@
   {"brand": "Binance", "keywords": ["binance"], "official_domains": ["binance.com", "binance.us"]},
   {"brand": "MetaMask", "keywords": ["metamask"], "official_domains": ["metamask.io"]},
   {"brand": "Trust Wallet", "keywords": ["trust wallet", "trustwallet"], "official_domains": ["trustwallet.com"]},
+  {"brand": "Ledger", "keywords": ["ledger live", "ledger wallet", "ledger nano", "ledgerlive", "ledgerwallet", "ledgr"], "address_keywords": ["ledger"], "official_domains": ["ledger.com"]},
+  {"brand": "Trezor", "keywords": ["trezor"], "official_domains": ["trezor.io"]},
   {"brand": "Facebook", "keywords": ["facebook"], "official_domains": ["facebook.com", "fb.com", "messenger.com", "meta.com"]},
   {"brand": "Instagram", "keywords": ["instagram"], "official_domains": ["instagram.com"]},
   {"brand": "WhatsApp", "keywords": ["whatsapp"], "official_domains": ["whatsapp.com", "wa.me"]},

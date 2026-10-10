@@ -15,10 +15,17 @@ import sandbox
 HTML = {"Content-Type": "text/html"}
 
 
+class Late:
+    """A route body that arrives after `seconds`: a slow frame, not a stalled one."""
+
+    def __init__(self, seconds: float, body: bytes):
+        self.seconds, self.body = seconds, body
+
+
 @asynccontextmanager
 async def serve(routes):
     """A local server. routes maps a path to (status, headers, body), or to a function of the request
-    headers that returns one; a body of None stalls forever.
+    headers that returns one; a body of None stalls forever, and Late(seconds, body) arrives late.
     Yields (port, hits) where hits lists every path the server was asked for."""
     hits = []
 
@@ -31,6 +38,9 @@ async def serve(routes):
         hits.append(path)
         route = routes.get(path, (404, HTML, b"not found"))
         status, headers, body = route(request_headers) if callable(route) else route
+        if isinstance(body, Late):
+            await asyncio.sleep(body.seconds)
+            body = body.body
         length = 100 if body is None else len(body)
         head = f"HTTP/1.1 {status} X\r\nContent-Length: {length}\r\nConnection: close\r\n"
         head += "".join(f"{k}: {v}\r\n" for k, v in headers.items()) + "\r\n"
@@ -181,6 +191,93 @@ async def test_a_page_that_disables_eval_is_still_read(allow_only_loopback_ip, t
 
 
 @pytest.mark.asyncio
+async def test_a_frame_that_is_styled_away_a_moment_after_it_appears_is_not_unread(allow_only_loopback_ip, tmp_path):
+    """Chat widgets and consent frames are inserted unstyled (visible, 300x150, still loading) and
+    hidden by the site's own script a moment later. On a slow machine that moment is long enough to
+    be caught mid-way; this is what turned citi.com and medicare.gov into 'couldn't check'."""
+    body = page('<h1>Welcome</h1><script>'
+                'const f = document.createElement("iframe"); f.src = "/widget"; document.body.appendChild(f);'
+                'setTimeout(() => { f.style.display = "none"; }, 2000);'
+                '</script>')
+    routes = {"/": (200, HTML, body), "/widget": (200, HTML, Late(3.5, page("chat")))}
+    async with serve(routes) as (port, _):
+        result = await sandbox.open_page(f"http://127.0.0.1:{port}/", tmp_path / "s.png")
+    assert result["read_errors"] == []
+    assert "Welcome" in result["text"]
+
+
+@pytest.mark.asyncio
+async def test_a_login_form_in_a_slow_visible_frame_is_read_when_it_arrives(allow_only_loopback_ip, tmp_path):
+    """The patience is for reading, not for excusing: a visible frame that holds a form is waited for
+    and read, so a slow login frame is not mistaken for no form."""
+    body = page('<h1>Sign in</h1><iframe src="/login" width="320" height="220"></iframe>')
+    login = page('<input type="password" name="pw"><input name="cvv" placeholder="CVV">')
+    routes = {"/": (200, HTML, body), "/login": (200, HTML, Late(1.0, login))}
+    async with serve(routes) as (port, _):
+        result = await sandbox.open_page(f"http://127.0.0.1:{port}/", tmp_path / "s.png")
+    assert [f["kind"] for f in result["sensitive_fields"]] == ["password", "card"]
+    assert result["read_errors"] == []
+
+
+@pytest.mark.asyncio
+async def test_a_visible_frame_that_never_arrives_is_still_unread_after_the_wait(allow_only_loopback_ip, tmp_path):
+    body = page('<h1>Sign in</h1><iframe src="/login" width="320" height="220"></iframe>')
+    async with serve({"/": (200, HTML, body), "/login": (200, HTML, None)}) as (port, _):
+        result = await sandbox.open_page(f"http://127.0.0.1:{port}/", tmp_path / "s.png")
+    assert result["read_errors"] == [{"what": "fields", "frame": "127.0.0.1"}]
+
+
+def _stub_frame(url: str, state: str = "loading"):
+    """An embedded frame that is visible, 300x150, and never gets past its loading state."""
+    async def evaluate(script):
+        return state if "readyState" in script else []
+
+    async def bounding_box():
+        return {"width": 300, "height": 150}
+
+    async def is_visible():
+        return True
+
+    async def get_attribute(name):
+        return url if name == "src" else ""
+
+    element = SimpleNamespace(bounding_box=bounding_box, is_visible=is_visible, get_attribute=get_attribute)
+
+    async def frame_element():
+        return element
+
+    return SimpleNamespace(url=url, evaluate=evaluate, frame_element=frame_element)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url", [
+    "https://4468676.fls.doubleclick.net/activityi;src=4468676",
+    "https://apps.use2.us-gov-pure.cloud/messenger/messenger.html",
+    "https://citi.demdex.net/dest5.html",
+])
+async def test_advertising_analytics_and_chat_frames_are_not_counted_when_they_stay_slow(monkeypatch, url):
+    monkeypatch.setattr(sandbox, "FRAME_WAIT_S", 0.2)
+    main = SimpleNamespace(url="https://bank.example/")
+    page_stub = SimpleNamespace(main_frame=main, url="https://bank.example/")
+    assert await sandbox._frame_fields(page_stub, _stub_frame(url)) == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url", [
+    "https://login.evil.example/signin",
+    "https://paypal-secure.top/form",
+    "https://evil.doubleclick.net.attacker.top/x",  # a lookalike of an ad host is not an ad host
+    "https://doubleclick.net.evil.example/x",
+])
+async def test_any_other_slow_visible_frame_is_unread(monkeypatch, url):
+    monkeypatch.setattr(sandbox, "FRAME_WAIT_S", 0.2)
+    main = SimpleNamespace(url="https://bank.example/")
+    page_stub = SimpleNamespace(main_frame=main, url="https://bank.example/")
+    with pytest.raises(sandbox._FrameNotRead):
+        await sandbox._frame_fields(page_stub, _stub_frame(url))
+
+
+@pytest.mark.asyncio
 async def test_a_read_that_fails_at_once_is_tried_again(tmp_path):
     """A page navigating at the instant we ask throws its script context away; a moment later it reads."""
     calls = {"text": 0}
@@ -266,9 +363,90 @@ async def test_a_page_that_never_gives_the_thread_back_cannot_hold_a_browser_slo
     assert result["loaded"] is True
 
 
+@pytest.mark.parametrize("value,expected", [
+    (None, 3), ("", 3), ("2", 2), ("1", 1), ("6", 6), (" 4 ", 4),
+    ("0", 3), ("-1", 3), ("7", 3), ("99", 3), ("two", 3), ("2.5", 3),
+])
+def test_the_number_of_browsers_comes_from_the_environment_within_limits(monkeypatch, value, expected):
+    if value is None:
+        monkeypatch.delenv("TRIPWIRE_BROWSERS", raising=False)
+    else:
+        monkeypatch.setenv("TRIPWIRE_BROWSERS", value)
+    assert sandbox._browsers_from_env() == expected
+
+
 def _leftover_task_reports(caplog) -> list[str]:
     gc.collect()  # a pending task that was dropped is reported when it is collected
     return [r.getMessage() for r in caplog.records if "Task was destroyed" in r.getMessage() or "never retrieved" in r.getMessage()]
+
+
+@pytest.mark.asyncio
+async def test_requests_that_arrive_while_the_browser_is_closing_leave_nothing_pending(monkeypatch, tmp_path, caplog):
+    """A busy page keeps requesting right up to the end. Each request that arrived after teardown
+    took its snapshot of in-flight work started a check nobody was left to finish: 24 'Task was
+    destroyed but it is pending' reports over 6 scans before the fix, none after."""
+    def slow_lookup(url):
+        time.sleep(0.25)  # a DNS lookup in a worker thread
+        return urlparse(url).hostname == "127.0.0.1"
+
+    monkeypatch.setattr(sandbox, "is_public", slow_lookup)
+    caplog.set_level(logging.DEBUG)
+    body = page('<h1>x</h1><script>setInterval(() => { for (let i = 0; i < 4; i++) '
+                'new Image().src = "/p" + Math.random(); }, 20)</script>')
+    for _ in range(3):
+        async with serve({"/": (200, HTML, body)}) as (port, _):
+            await sandbox.open_page(f"http://127.0.0.1:{port}/", tmp_path / "s.png")
+    await asyncio.sleep(0.8)
+    assert _leftover_task_reports(caplog) == []
+
+
+@pytest.mark.asyncio
+async def test_a_request_that_arrives_after_teardown_began_is_refused_not_checked():
+    calls = []
+
+    class FakeRoute:
+        request = SimpleNamespace(url="http://127.0.0.1/late", resource_type="image", frame=None)
+
+        async def abort(self):
+            calls.append("abort")
+
+        async def continue_(self):
+            calls.append("continue")
+
+        async def fulfill(self, **kwargs):
+            calls.append("fulfill")
+
+    handlers = {}
+
+    class FakeContext:
+        async def route(self, pattern, handler):
+            handlers["request"] = handler
+
+        async def route_web_socket(self, *args):
+            pass
+
+        async def new_cdp_session(self, page):
+            class Session:
+                async def send(self, method, params=None):
+                    return {"frameTree": {"frame": {"id": "main"}}}
+
+                def on(self, *args):
+                    pass
+
+            return Session()
+
+    class FakePage:
+        main_frame = object()
+
+        def on(self, *args):
+            pass
+
+    guard = {"blocked": None, "tasks": set(), "closing": False}
+    await sandbox._install_guards(FakeContext(), FakePage(), {"blocked_requests": 0, "redirects": []}, guard)
+    guard["closing"] = True
+    await handlers["request"](FakeRoute())
+    assert calls == ["abort"]  # never continued, never given a lookup
+    assert guard["tasks"] == set()
 
 
 def test_the_sandbox_never_fetches_a_document_itself():
