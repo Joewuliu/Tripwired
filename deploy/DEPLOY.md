@@ -8,10 +8,128 @@ Three containers run with Docker Compose:
 - **caddy** is the only thing on the internet: HTTPS on 80/443 for a free `*.sslip.io` hostname,
   forwarding only the routes a visitor needs. `POST /analyze` is never exposed.
 
-The VM should be used for nothing else: it opens live phishing pages.
+The VM should be used for nothing else: it opens live phishing pages. If the VM has run an earlier
+deployment, start at step 0.
 
 Commands marked **laptop** run in Windows PowerShell; commands marked **VM** run over SSH.
 Replace `VM_NAME` and `ZONE` with yours.
+
+## 0. Clear any previous deployment (VM; skip if this VM has never run Tripwire)
+
+A previous deployment on the same VM collides with this one in four ways: its Docker network is
+also called `tripwire` and uses the same subnet (172.30.0.0/24), its firewall rules name that
+subnet, its gateway may still be answering messages on the same Photon project, and its folder may
+be the one step 4 wants to clone into. Remove all four before going on.
+
+### 0a. Look first (read-only)
+
+```bash
+docker compose ls -a
+docker ps -a --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}'
+docker network ls
+sudo iptables -S DOCKER-USER
+sudo iptables -S INPUT | grep -E '172\.30\.0\.|tripwire' || true
+systemctl list-unit-files --type=service | grep -i -E 'tripwire|egress' || true
+sudo ss -ltnp | grep -E ':(80|443)\b' || true
+```
+
+Note the folder in the `CONFIG FILES` column of `docker compose ls -a`: that is the old stack's
+folder. Anything else you do not recognise in these lists is not Tripwire's: leave it alone.
+
+### 0b. Shut the old stack down
+
+From the old stack's folder (the one holding its `docker-compose.yml`):
+
+```bash
+cd /PATH/TO/OLD/FOLDER
+docker compose down --remove-orphans
+```
+
+If the folder is gone, use the project name from `docker compose ls -a` instead:
+`docker compose -p PROJECT_NAME down --remove-orphans`.
+
+Then remove whatever still sits on the old network, and the network itself:
+
+```bash
+docker ps -aq --filter network=tripwire | xargs -r docker rm -f
+docker network rm tripwire
+```
+
+`No such network` is fine: it means `down` already removed it. If `network rm` says the network
+"has active endpoints", something is still attached:
+`docker network inspect tripwire --format '{{range .Containers}}{{.Name}} {{end}}'`.
+
+(`down` without `-v` keeps volumes. Old volumes hold nothing this version needs; list them with
+`docker volume ls` and remove the ones that belong to the old stack with `docker volume rm NAME`.)
+
+### 0c. Remove the old firewall rules
+
+This deletes only rules that mention the 172.30.0.x network or carry a `tripwire` comment, in the
+two chains an egress script would have used. It does not touch Docker's own rules.
+
+```bash
+for chain in DOCKER-USER INPUT; do
+  sudo iptables -S "$chain" | grep -E '172\.30\.0\.|tripwire' | sed 's/^-A /-D /' | while read -r rule; do
+    echo "removing: $rule"
+    sudo iptables $rule
+  done
+done
+sudo iptables -S DOCKER-USER
+sudo iptables -S INPUT | grep -E '172\.30\.0\.|tripwire' || echo "INPUT: no old rules"
+```
+
+Expected: `DOCKER-USER` shows only `-N DOCKER-USER` and `-A DOCKER-USER -j RETURN`, and the INPUT line
+says no old rules. If a rule is left (for example a comment with spaces), delete it by number:
+`sudo iptables -L DOCKER-USER -n --line-numbers`, then `sudo iptables -D DOCKER-USER N`.
+
+### 0d. Remove whatever re-applies them at boot
+
+```bash
+systemctl list-unit-files --type=service | grep -i -E 'tripwire|egress' || true
+sudo grep -rIl -i -E 'egress|172\.30\.0\.' /etc/systemd /etc/cron.d /etc/cron.daily /etc/rc.local /etc/iptables 2>/dev/null || true
+```
+
+For each service the first command prints (for example `tripwire-egress.service`), look at what it
+runs and then remove it:
+
+```bash
+systemctl cat NAME.service --no-pager
+sudo systemctl disable --now NAME.service
+sudo rm -f /etc/systemd/system/NAME.service
+sudo systemctl daemon-reload
+```
+
+Anything the second command lists (a cron job, `rc.local`, saved iptables rules) is another
+persistence mechanism for the old rules: open it, remove the old lines, and save.
+
+### 0e. Move the old folder aside
+
+If the old stack lived in `~/tripwire`, step 4 clones into the same name. Move it instead of
+deleting it:
+
+```bash
+[ -d ~/tripwire ] && mv ~/tripwire ~/tripwire-previous
+```
+
+Its `.env` may hold keys you still want (feed keys, Photon project). Open it with `nano` and copy
+the values you need into the new `.env` in step 5; do not `cat` it into a shared terminal. Delete
+the folder once the new stack works: `rm -rf ~/tripwire-previous`.
+
+### 0f. Check it is clean
+
+| Check | Expected |
+| --- | --- |
+| `docker ps -a` | no Tripwire containers |
+| `docker network ls` | no network named `tripwire` |
+| `sudo iptables -S DOCKER-USER` | only `-N DOCKER-USER` and `-A DOCKER-USER -j RETURN` |
+| `sudo iptables -S INPUT \| grep -E '172\.30\.0\.\|tripwire'` | nothing |
+| `systemctl list-unit-files \| grep -i -E 'tripwire\|egress'` | nothing |
+| `sudo ss -ltnp \| grep -E ':(80\|443)\b'` | nothing (Caddy needs both ports) |
+| `ls ~/tripwire` | `No such file or directory` |
+| `docker system df` | tells you how much old image space there is; `docker image prune -f` reclaims dangling layers, `docker builder prune -f` the build cache |
+
+Also stop the gateway on your laptop now if it is running: two gateways on one Photon project would
+both answer every message.
 
 ## 1. Open ports 80 and 443 (laptop, once)
 
@@ -32,7 +150,14 @@ gcloud compute ssh $VM --zone $ZONE
 
 ## 3. Install Docker and iptables (VM, once)
 
-Check first: `docker compose version`. If that works, skip to step 4.
+Check first: `docker compose version`. If it prints a version, Docker is installed: skip the Docker
+installation below and only make sure the two small tools exist, then go to step 4:
+
+```bash
+sudo apt-get update && sudo apt-get install -y git iptables
+```
+
+Otherwise install everything:
 
 ```bash
 sudo apt-get update
@@ -50,7 +175,8 @@ Log out and back in (so the `docker` group applies), then `docker compose versio
 
 ## 4. Get the code onto the VM
 
-The repository is private, so pick one.
+The repository is private, so pick one. The commands below put it in `~/tripwire`, which step 0e
+cleared if an older deployment lived there.
 
 ### Option A: a read-only deploy key (best: updates are `git pull`)
 
@@ -157,7 +283,8 @@ sudo bash deploy/egress-firewall.sh
 ```
 
 It prints the rules it added and is safe to run again. The rules are lost on reboot, so keep them
-with a systemd unit that re-applies them whenever Docker starts:
+with a systemd unit that re-applies them whenever Docker starts (step 0d removed any older unit
+with this name, so this creates a fresh one):
 
 ```bash
 sudo tee /etc/systemd/system/tripwire-egress.service >/dev/null <<EOF
