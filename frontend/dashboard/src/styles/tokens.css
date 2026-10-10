@@ -1,0 +1,57 @@
+:root {
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
+  color: #123447;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  --sky-top: #ddf6ff;
+  --sky-middle: #b9e8f8;
+  --horizon: #d6efcb;
+  --glass-solid: #f4fcff;
+  --glass: rgba(255,255,255,.88);
+  --text: #123447;
+  --secondary: #36576a;
+  --aqua: #096c86;
+  --highlight: #7fe3eb;
+  --edge: #92bdcd;
+  --focus: #005fcc;
+  --danger: #8a1832;
+  --danger-fill: #fde8ee;
+  --amber: #754500;
+  --amber-fill: #fff1cf;
+  --green: #17543d;
+  --green-fill: #e2f4e9;
+  --unknown: #465264;
+  --unknown-fill: #edf1f5;
+  --report-surface: #eef8f2;
+  --report-rim: #6aa5a5;
+  --report-toolbar-top: #d9eeeb;
+  --report-toolbar-bottom: #b9dadd;
+  --report-backdrop-blur: 16px;
+  --mono: 'Cascadia Code', Consolas, 'SFMono-Regular', monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; font-size: 16px; line-height: 1.5; background: var(--sky-top); }
+button, input, select, textarea { font: inherit; color: inherit; }
+button, a, select, summary { -webkit-tap-highlight-color: transparent; }
+button { cursor: pointer; }
+button:disabled { cursor: default; opacity: .65; }
+button, input, select, textarea, a { touch-action: manipulation; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+h1, h2, h3, h4, p { margin: 0; }
+h2 { font-size: 22px; line-height: 1.3; letter-spacing: -.5px; }
+h3 { font-size: 18px; line-height: 1.4; font-weight: 600; }
+h4 { font-size: 15px; font-weight: 600; }
+svg { flex-shrink: 0; vertical-align: middle; }
+a { color: var(--aqua); }
+::selection { color: var(--text); background: #b7e7dc; }
+input, textarea { caret-color: var(--aqua); }
+a { text-underline-offset: 3px; }
+time, .count-orb, .coverage-pill { font-variant-numeric: tabular-nums; }
+.small { font-size: 13px; color: var(--secondary); }
+.eyebrow { font-size: 10px; font-weight: 650; letter-spacing: 1.8px; color: #3c6475; margin-bottom: 7px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.spin { animation: spin 1.4s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+@media (forced-colors: active) { .risk-badge, .glass-panel, .button, .scan-bubble, .check-card { border: 1px solid ButtonText !important; } }

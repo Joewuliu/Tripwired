@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="referrer" content="no-referrer" />
+  <meta name="theme-color" content="#DDF6FF" />
+  <title>Tripwire · Link intelligence</title>
+  {% for file in entry_css %}
+  <link rel="stylesheet" href="/{{ file }}" />
+  {% endfor %}
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/{{ entry_script }}"></script>
+</body>
+</html>

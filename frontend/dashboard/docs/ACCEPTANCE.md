@@ -1,0 +1,49 @@
+# MVP acceptance and verification
+
+## Frontend delivery
+
+The official component names and `src` grouping are preserved. The outer `frontend` folder is renamed `dashboard` as requested. The user-removed redirect-chain UI is absent. No gateway or analyzer files have been changed.
+
+| Specification area | Implemented frontend behavior | Verification |
+| --- | --- | --- |
+| Header and Aero theme | Local glossy shield/globe, sky and horizon, glass surfaces, exact creator credit | Desktop and phone visual review |
+| URL form | Single HTTP(S) URL, normalization, credentials/private-host rejection, inline errors, retained input | Unit and browser tests |
+| History | Twenty records per page, server filters, all required sort/filter choices, query parameters, load more | Domain and browser tests |
+| Report route | `/r/:id`, direct loading, refresh, Back/Forward, retained filters | Browser tests |
+| Modal | Desktop 80vw/80dvh, responsive rim, native background isolation, focus containment/restoration, Escape | Browser keyboard tests at 320px; visual review |
+| URL safety | Defanged selectable text, no suspect anchors/frames/images, no destination validation fetch | URL unit tests and request interception tests |
+| Screenshots | Authorized raster path whitelist, contain fitting, inline enlarge, source/date, missing/expired states | Browser and schema tests; visual review |
+| Check presentation | Truthful statuses, ordered reveals, show-all, reduced motion, provisional danger | Demo playback and mocked live API tests |
+| Evidence and verdict | Nullable Unknown, partial coverage, attributed disclosures, template/Gemini metadata, score not probability | Runtime schemas and report tests |
+| Final actions | Recommendations, 7726 for image inputs, safe copy, manual clipboard fallback, fixed FTC continuation | Browser tests |
+| Rescan | Fresh job via server-held original URL, no replay of redacted private values | Mocked live API browser test |
+| Transport | Scoped keys, session cache clearing, abort signals, bounded retries, revision guard, CSRF/idempotency, 429 | Unit and mocked live API tests |
+| Demo honesty | Visible recorded labels, local illustrative raster, fixture-only playback, separate caches | Browser tests |
+| Production assets | TypeScript build, hashed Vite files and manifest, Jinja shell example | Production build |
+| VS Code | One folder, workspace, tasks, Chrome debugging configuration | Files inspected |
+
+The initial desktop composition was inspected at 1440×900. The October 10 design refinement was visually inspected at the in-app browser's native desktop size and at 390×844; updated screenshots are in `docs/previews`. The compact input keeps five complete scan rows in the desktop initial view. Browser overflow and modal focus were tested at 320×740. Reduced motion removes animation and result pacing. Text is on mostly opaque surfaces; risk labels always include text and icons. A complete manual screen-reader pass remains a pre-production check.
+
+The latest user request overrides the original recognizable-homepage backdrop: the report now uses 16px blur, dimming, and desaturation. Its green glass tint distinguishes it from the blue homepage without changing semantic risk colors. Scan rows and decorative bubbles have stronger rims, reflections, and depth. The slogan above the title is removed. Mode controls, reset, and evidence disclosure targets have a 44px minimum height; placeholder and input-edge contrast were strengthened.
+
+## Server responsibilities remain outside this UI delivery
+
+The frontend is wired for the specified live JSON API. Tests of this contract use mocked responses; there was no analyzer repository or live analyzer service available here. Actual live scanning requires configuring and verifying the existing server.
+
+The analyzer must implement scoped sessions and access, capability exchange, durable queue acknowledgment, restart recovery, SQLite history, scoring and coverage, real provider checks, screenshot capture/authorization/retention, rate limiting, rescan of the protected original, and JSON errors. These are documented in `API-INTEGRATION.md`. They are not simulated as live features.
+
+No remote GitHub push, pull request, or hosted deployment has been performed. The repository URL is required to place the standalone folder in the intended repository. All local changes are accessible in the supplied VS Code workspace.
+
+## Commands
+
+Latest refinement: the production build and all 14 browser tests passed. Demo and mocked-live tests explicitly verify that the completed summary precedes the checks, the running report has no final summary, and the introductory verdict is absent. Desktop and 390px phone views were inspected; cursor assets and rounded filter styling were confirmed through computed browser styles. Translucent glass retains opaque fallbacks, reduced motion, keyboard focus rims, and forced-color treatment. Actual live scanning is still unconnected.
+
+Final verification: production build passed, 21 unit tests passed, and 14 browser tests passed. Browser coverage includes a mocked live analyzer; it does not claim a connection to a real deployed backend.
+
+```sh
+npm run build
+npm test
+npm run test:browser
+```
+
+Browser tests require installed Playwright Chromium or `PLAYWRIGHT_CHROMIUM_EXECUTABLE`. The test suite intentionally covers user flows, privacy boundaries, error behavior, and API interactions rather than merely mirroring component markup.
