@@ -462,9 +462,10 @@ How to read it:
   are the two numbers that matter. Paste either section to whoever is tuning the scoring.
 - Add `--seed 7` to repeat exactly the same sample. Screenshots land in `data/live/<timestamp>/`.
 
-**If the log shows `read of screenshot failed after 4.0s`:** the browsers are competing for the VM's
-CPU (an `e2-medium` has one sustained vCPU shared by everything). Count them, then try fewer browsers
-at once and run the same sample again:
+**If the log shows `read of screenshot failed after 8.x s`** (the screenshot is given 8 seconds, taken
+at 2×, 780 px wide): the browsers are competing for the VM's CPU (an `e2-medium` has one sustained
+vCPU shared by everything; a bigger machine is the real fix). Count them, then try fewer browsers at
+once and run the same sample again:
 
 ```bash
 docker compose logs analyzer | grep -c "read of screenshot failed"

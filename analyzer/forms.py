@@ -24,7 +24,7 @@ READ_FIELDS_JS = """() => [...document.querySelectorAll('input, textarea, select
         label: (el.labels && el.labels[0] ? el.labels[0].innerText : '').slice(0, 80),
     }))"""
 
-KINDS = ("password", "card", "ssn", "bank", "otp", "pin")  # also the order they are reported in
+KINDS = ("password", "card", "ssn", "bank", "otp", "pin", "seed")  # also the order they are reported in
 
 _NOT_TYPED_INTO = {"radio", "checkbox", "submit", "button", "reset", "image", "file", "range", "color"}
 
@@ -42,6 +42,12 @@ _PATTERNS = [(kind, re.compile(pattern)) for kind, pattern in (
              r"|security code|expir(y|ation)|\bexp ?(date|month|year)"),
     ("ssn", r"\bssn\b|social security"),
     ("bank", r"routing ?(number|no\b|num)|account ?(number|no\b|num)|\biban\b|sort code"),
+    # A cryptocurrency wallet's recovery phrase (12 to 24 words) or private key: whoever has it owns the
+    # wallet, and a real wallet site never asks a visitor to type it into a web page. Phishing kits show a
+    # textarea for it, or twelve boxes labelled "Word 1" to "Word 12". A bare "seed" is not matched: a
+    # game's random seed is also a text box.
+    ("seed", r"(seed|recovery|backup|secret|mnemonic) ?(phrase|words?)|\bmnemonic\b|\bprivate ?key\b"
+             r"|\bwallet ?(seed|phrase|key|words?)\b|\b(12|15|18|21|24)[ -]?words?\b|\bword ?#? ?\d{1,2}\b"),
     ("otp", r"\botp\b|one ?time ?(code|pass|pin)|verification code|auth(entication)? code|\b2fa\b|sms code"),
     ("pin", r"\bpin\b(?! ?code)"),
     ("password", r"pass ?word|passcode|passwd|\bpwd\b"),

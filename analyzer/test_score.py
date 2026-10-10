@@ -111,6 +111,26 @@ def test_a_brand_only_mentioned_in_the_text_still_builds_up_with_a_form():
     assert result.verdict == "suspicious"
 
 
+def test_a_recovery_phrase_request_is_described_in_plain_words_and_builds_up_like_any_form():
+    plain = judge(scan(fields=[field("seed")]))
+    assert "Page asks for a wallet recovery phrase (page scan)" in plain.observations
+    assert (plain.verdict, plain.score) == ("no_red_flags", 10)  # small alone, like every other kind
+    # ...and with a wallet brand in the address and on a free host (a Ledger look-alike), it is a phish
+    url = "https://visit-ledgr-helps.square.site/"
+    scam = judge(scan(final_url=url, brand=check_brand(url), fields=[field("seed")] * 12))
+    assert scam.verdict == "dangerous"
+    assert {e.id for e in scam.evidence if e.points} >= {
+        "impersonation", "sensitive_fields", "brand_with_sensitive_fields", "free_host_credentials",
+        "free_host_many_fields",
+    }
+
+
+def test_a_recovery_phrase_on_a_wallets_own_site_is_shown_not_counted():
+    result = judge(scan(final_url="https://www.ledger.com/", brand=[brand("official", "Ledger")], fields=[field("seed")]))
+    assert result.verdict == "no_red_flags" and result.score == 0
+    assert next(e for e in result.evidence if e.id == "sensitive_fields").points == 0
+
+
 # --- a brand named only in the URL path --------------------------------------------------------
 
 def at(url, **overrides):
@@ -304,14 +324,75 @@ def test_a_brand_new_domain_that_has_vanished_is_suspicious():
     assert result.verdict == "suspicious" and result.score == 30 + 10
 
 
-def test_a_page_that_never_finished_and_shows_nothing_is_couldnt_check():
-    result = judge(scan(opened={"loaded": True, "complete": False, "has_screenshot": False, "text": ""}))
+REASON_IDS = {"hides_from_sandbox", "not_opened", "not_read", "not_finished"}
+
+
+def reason_lines(result):
+    return [e for e in result.evidence if e.id in REASON_IDS]
+
+
+def test_a_page_that_ran_out_of_time_says_so():
+    """The usps.com case: the page was still loading when its time was up and the screenshot failed.
+    It was 'couldn't check' with only 'Registered 29 years ago' under it."""
+    opened = {"loaded": True, "complete": False, "has_screenshot": False, "text": "Quick tools", "final_status": 200,
+              "title": "USPS", "error": None, "read_errors": [{"what": "screenshot", "frame": None}]}
+    from access import judge_access
+
+    result = judge(scan(opened=opened, access=judge_access(opened)))
     assert result.verdict == "couldnt_check"
+    reasons = reason_lines(result)
+    assert len(reasons) == 1 and "had not finished loading" in reasons[0].label
+    assert result.observations[0] == reasons[0].label  # and it is the first thing a person reads
 
 
-def test_a_page_that_never_finished_but_showed_content_is_judged_normally():
-    result = judge(scan(opened={"loaded": True, "complete": False, "has_screenshot": True, "text": "Half a shop"}))
+def test_every_couldnt_check_says_why_whatever_combination_led_to_it():
+    """The invariant behind the USPS bug: a verdict of couldn't check is never given without a reason
+    line. Every combination of what the sandbox can report, run through the real access judgement."""
+    import itertools
+
+    from access import judge_access
+
+    checked = 0
+    for loaded, complete, shot, text, status, error, reads in itertools.product(
+        (True, False), (True, False), (True, False), ("", "Some words on the page"),
+        (200, 403, 404, 429, None),
+        (None, "Page.goto: Timeout 10000ms exceeded.", "Page.goto: net::ERR_NAME_NOT_RESOLVED at x",
+         "blocked: not a public address", "Page.goto: net::ERR_HTTP2_PROTOCOL_ERROR at x"),
+        ([], [{"what": "screenshot", "frame": None}], [{"what": "text", "frame": None}],
+         [{"what": "fields", "frame": "ads.example"}], [{"what": "fields", "frame": ""}]),
+    ):
+        opened = {"loaded": loaded, "complete": complete and loaded, "has_screenshot": shot and loaded, "text": text if loaded else "",
+                  "title": "T" if text and loaded else "", "final_status": status if loaded else None,
+                  "error": error if not loaded else None, "read_errors": reads if loaded else []}
+        result = judge(scan(opened=opened, access=judge_access(opened)))
+        checked += 1
+        if result.verdict == "couldnt_check":
+            assert reason_lines(result), f"no reason given for {opened}"
+            assert result.observations[0] in {e.label for e in reason_lines(result)}, opened
+    assert checked > 1000
+
+
+def test_a_page_that_never_finished_and_shows_nothing_is_couldnt_check():
+    from access import judge_access
+
+    opened = {"loaded": True, "complete": False, "has_screenshot": False, "text": ""}
+    result = judge(scan(opened=opened, access=judge_access(opened)))
+    assert result.verdict == "couldnt_check"
+    assert reason_lines(result)
+
+
+def test_a_page_that_never_finished_but_showed_content_is_judged_normally_and_says_it_was_partial():
+    from access import judge_access
+
+    opened = {"loaded": True, "complete": False, "has_screenshot": True, "text": "Half a shop"}
+    result = judge(scan(opened=opened, access=judge_access(opened)))
     assert result.verdict == "no_red_flags"
+    note = next(e for e in result.evidence if e.id == "partial_page")
+    assert note.points == 0 and "only part of it was checked" in note.label
+
+
+def test_a_complete_page_carries_no_partial_note():
+    assert not any(e.id == "partial_page" for e in judge(scan()).evidence)
 
 
 # --- the output ----------------------------------------------------------------------------

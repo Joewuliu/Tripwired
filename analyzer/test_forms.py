@@ -37,6 +37,22 @@ def field(**attrs):
     (dict(autocomplete="one-time-code"), "otp"),
     (dict(name="pin"), "pin"),
     (dict(ariaLabel="Enter your PIN"), "pin"),
+    # a wallet's recovery phrase or private key
+    (dict(name="seedPhrase"), "seed"),
+    (dict(name="seed_phrase"), "seed"),
+    (dict(id="recovery-phrase"), "seed"),
+    (dict(placeholder="Enter your 12-word recovery phrase"), "seed"),
+    (dict(placeholder="Secret Recovery Phrase"), "seed"),
+    (dict(label="Enter your 24 words"), "seed"),
+    (dict(type="textarea", name="mnemonic"), "seed"),
+    (dict(name="privateKey"), "seed"),
+    (dict(placeholder="Private key"), "seed"),
+    (dict(ariaLabel="Backup phrase"), "seed"),
+    (dict(name="wallet_seed"), "seed"),
+    (dict(placeholder="Word 1"), "seed"),  # twelve boxes, one per word
+    (dict(ariaLabel="Word #12"), "seed"),
+    (dict(name="word-7"), "seed"),
+    (dict(label="Please input your wallet words"), "seed"),
 ])
 def test_sensitive_fields_are_recognised(attrs, kind):
     assert classify(field(**attrs)) == kind
@@ -61,6 +77,19 @@ def test_sensitive_fields_are_recognised(attrs, kind):
     dict(placeholder="One time gift amount"),
     dict(type="checkbox", name="save_card_number", label="Save card number"),
     dict(type="submit", name="update_password"),
+    # seed and key are ordinary words elsewhere
+    dict(name="seed"),  # a game's or a generator's random seed
+    dict(placeholder="Random seed"),
+    dict(name="keyword"),
+    dict(placeholder="Search by keyword"),
+    dict(name="primary_key"),
+    dict(name="public_key"),
+    dict(placeholder="Word of the day"),
+    dict(name="wordcount"),
+    dict(name="crossword"),
+    dict(placeholder="Enter 12 digits"),
+    dict(name="phrase_search"),
+    dict(placeholder="Search for a phrase"),
 ])
 def test_ordinary_fields_are_not_sensitive(attrs):
     assert classify(field(**attrs)) is None
@@ -78,3 +107,15 @@ def test_kinds_are_listed_once_in_a_fixed_order():
     found = sensitive_fields([field(name="cvv"), field(type="password"), field(name="card_number"), field(name="otp")])
     assert kinds_asked_for(found) == ["password", "card", "otp"]
     assert kinds_asked_for([]) == []
+
+
+def test_twelve_boxes_for_twelve_words_are_one_kind_asked_once():
+    boxes = [field(name=f"word{i}", placeholder=f"Word {i}") for i in range(1, 13)]
+    found = sensitive_fields(boxes)
+    assert len(found) == 12 and {f["kind"] for f in found} == {"seed"}
+    assert kinds_asked_for(found) == ["seed"]
+
+
+def test_a_recovery_phrase_beside_a_password_reports_both_in_a_fixed_order():
+    found = sensitive_fields([field(name="seed_phrase"), field(type="password")])
+    assert kinds_asked_for(found) == ["password", "seed"]

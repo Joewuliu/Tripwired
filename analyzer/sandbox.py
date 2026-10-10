@@ -44,6 +44,8 @@ FIRST_RESPONSE_S = 10
 DOM_READY_S = 8
 SETTLE_MS = 1500  # let script-heavy pages finish drawing
 READ_TIMEOUT_S = 4
+SCREENSHOT_TIMEOUT_S = 8  # a busy page can make the picture slow; the other reads are not held up for it
+DEVICE_SCALE = 2  # the screenshot is 390 css px x 2 = 780 px wide: crisp on a phone, a quarter of the cost of x3
 READ_RETRY_S = 0.5
 CLOSE_TIMEOUT_S = 3  # closing the browser; a stuck page must not hold a browser slot
 END_CHECKS_S = 1  # how long teardown waits for the checks it cancelled
@@ -315,11 +317,11 @@ async def _read_page(page, result: dict, shot_path: Path, guard: dict | None = N
             await asyncio.sleep(READ_RETRY_S)
             return await make()
 
-    async def read(what: str, make, frame: str | None = None):
+    async def read(what: str, make, frame: str | None = None, timeout: float = READ_TIMEOUT_S):
         """make() starts the read. Returns its value, or None after recording why not."""
         started = time.monotonic()
         try:
-            return await asyncio.wait_for(attempt(make), READ_TIMEOUT_S)
+            return await asyncio.wait_for(attempt(make), timeout)
         except Exception as exc:
             if isinstance(exc, _FrameNotRead):
                 frame = exc.host
@@ -335,7 +337,9 @@ async def _read_page(page, result: dict, shot_path: Path, guard: dict | None = N
 
     frames = page.frames[:MAX_FRAMES]  # login and payment forms often sit in an iframe, so every frame is asked
     _, title, text, *per_frame = await asyncio.gather(
-        read("screenshot", lambda: page.screenshot(path=str(shot_path), timeout=READ_TIMEOUT_S * 1000)),
+        # Playwright's own timeout fires first (it cleans up after itself); ours is the backstop.
+        read("screenshot", lambda: page.screenshot(path=str(shot_path), timeout=SCREENSHOT_TIMEOUT_S * 1000),
+             timeout=SCREENSHOT_TIMEOUT_S + 1),
         read("title", page.title),
         read("text", lambda: page.inner_text("body")),
         *(frame_read(frame) for frame in frames),
@@ -389,7 +393,8 @@ async def open_page(url: str, shot_path: Path) -> dict:
         async with async_playwright() as pw:
             browser = await pw.chromium.launch()
             ctx = await browser.new_context(
-                **pw.devices["iPhone 13"], accept_downloads=False, service_workers="block"
+                **{**pw.devices["iPhone 13"], "device_scale_factor": DEVICE_SCALE},
+                accept_downloads=False, service_workers="block",
             )
             page = await ctx.new_page()
             guard = {"blocked": None, "tasks": set(), "closing": False}

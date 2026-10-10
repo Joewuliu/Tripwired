@@ -9,7 +9,11 @@ judge_access returns None when the page opened normally, otherwise {"kind", "det
   refused      the server refused the sandbox's phone browser (401, 403, 429, 451, 503)
   bot_check    a "verify you are human" or access-denied page instead of the content
   unreadable   the page, or a frame in it, was too slow to read: whatever it asks for we did not see
+  unfinished   the page was still loading when its time was up, and too little of it was seen
   blank        the page finished loading and showed nothing at all (only claimed when it was read)
+
+Every one of these ends as "couldn't check" when nothing else scores 30, and every one carries a
+sentence saying why: score.py gives the verdict no other way to be uninspected.
 
 A page that hides from automated visitors, or vanishes soon after it is sent, is mild evidence on
 its own. More importantly, in every one of these cases we did not see the real page, so a later
@@ -67,7 +71,16 @@ def judge_access(opened: dict) -> dict | None:
     unread = _unread(opened.get("read_errors") or [])
     if unread:
         return {"kind": "unreadable", "detail": unread}
-    if opened.get("complete") and not text.strip() and not title.strip():
+    if not opened.get("complete", True):
+        # The page was still arriving when its time was up. What was seen is partial: a form further
+        # down the document may not have been parsed. With a screenshot and some text it is judged as
+        # seen; without either, there is too little to say anything about it.
+        if not text.strip():
+            return {"kind": "unfinished", "detail": "no text had arrived"}
+        if not opened.get("has_screenshot", True):
+            return {"kind": "unfinished", "detail": "no screenshot could be taken"}
+        return None
+    if not text.strip() and not title.strip():
         return {"kind": "blank", "detail": "nothing was shown"}
     return None
 

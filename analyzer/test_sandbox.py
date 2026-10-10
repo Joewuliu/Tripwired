@@ -5,6 +5,7 @@ import logging
 import socket
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import urlparse
 
@@ -496,7 +497,8 @@ async def test_reads_are_made_together_so_stalls_do_not_add_up(tmp_path):
     started = asyncio.get_running_loop().time()
     await sandbox._read_page(page_stub, result, tmp_path / "s.png")
     took = asyncio.get_running_loop().time() - started
-    assert took < sandbox.READ_TIMEOUT_S + 1.5, f"took {took:.1f}s"
+    # Four reads of 4s plus a picture of 9s would be 25s one after another. Together it is the longest one.
+    assert took < sandbox.SCREENSHOT_TIMEOUT_S + 1 + 1.5, f"took {took:.1f}s"
     failed = {(e["what"], e["frame"]) for e in result["read_errors"]}
     assert failed == {
         ("fields", None), ("fields", "frame.example"), ("screenshot", None), ("text", None), ("title", None),
@@ -511,6 +513,78 @@ async def test_a_page_that_is_still_navigating_does_not_end_the_scan(allow_only_
         result = await sandbox.open_page(f"http://127.0.0.1:{port}/", tmp_path / "s.png")
     assert result["loaded"] is True
     assert result["text"] or result["read_errors"], "either it was read or the failure was recorded"
+
+
+@pytest.mark.asyncio
+async def test_the_screenshot_is_780_pixels_wide(allow_only_loopback_ip, tmp_path):
+    """iPhone 13 is 390 css px wide: at 2x that is 780. (It was 1170 at 3x, four times the pixels per area
+    to render and encode on a small VM.)"""
+    import struct
+
+    async with serve({"/": (200, HTML, page("<h1>Hello</h1>"))}) as (port, _):
+        result = await sandbox.open_page(f"http://127.0.0.1:{port}/", tmp_path / "s.png")
+    header = (tmp_path / "s.png").read_bytes()[:24]
+    width, height = struct.unpack(">II", header[16:24])
+    assert result["has_screenshot"]
+    assert (width, height) == (780, 1328)  # 390 x 664 css px, viewport only, at 2x
+
+
+def test_the_timeouts_are_the_ones_chosen():
+    assert sandbox.SCREENSHOT_TIMEOUT_S == 8
+    assert sandbox.READ_TIMEOUT_S == 4  # text, title and forms are not given longer
+    assert sandbox.DEVICE_SCALE == 2
+
+
+@pytest.mark.asyncio
+async def test_a_slow_screenshot_is_waited_for_but_does_not_hold_up_the_other_reads(tmp_path, monkeypatch):
+    monkeypatch.setattr(sandbox, "READ_TIMEOUT_S", 0.3)
+    monkeypatch.setattr(sandbox, "SCREENSHOT_TIMEOUT_S", 1.5)
+    seen = {}
+
+    async def slow_shot(path, timeout):
+        await asyncio.sleep(0.9)  # longer than a normal read is given, within the screenshot's own time
+        Path(path).write_bytes(b"\x89PNG")
+
+    async def instant(*args, **kwargs):
+        seen.setdefault("others", asyncio.get_running_loop().time())
+        return "x"
+
+    async def no_fields(script):
+        return []
+
+    main_frame = SimpleNamespace(url="https://page.example/", evaluate=no_fields)
+    stub = SimpleNamespace(url="https://page.example/", screenshot=slow_shot, title=instant, inner_text=instant,
+                           frames=[main_frame], main_frame=main_frame)
+    result = {"read_errors": [], "final_url": None}
+    await sandbox._read_page(stub, result, tmp_path / "s.png")
+    assert result["has_screenshot"] is True and result["read_errors"] == []  # 0.9s is over READ_TIMEOUT_S, and fine
+    assert result["title"] == "x" and result["text"] == "x"
+
+
+@pytest.mark.asyncio
+async def test_a_screenshot_that_never_comes_is_recorded_after_its_own_longer_wait(tmp_path, monkeypatch):
+    monkeypatch.setattr(sandbox, "READ_TIMEOUT_S", 0.2)
+    monkeypatch.setattr(sandbox, "SCREENSHOT_TIMEOUT_S", 0.6)
+
+    async def never(path, timeout):
+        await asyncio.sleep(30)
+
+    async def instant(*args, **kwargs):
+        return "x"
+
+    async def no_fields(script):
+        return []
+
+    main_frame = SimpleNamespace(url="https://page.example/", evaluate=no_fields)
+    stub = SimpleNamespace(url="https://page.example/", screenshot=never, title=instant, inner_text=instant,
+                           frames=[main_frame], main_frame=main_frame)
+    result = {"read_errors": [], "final_url": None}
+    started = asyncio.get_running_loop().time()
+    await sandbox._read_page(stub, result, tmp_path / "s.png")
+    took = asyncio.get_running_loop().time() - started
+    assert 0.5 < took < 2.0, took  # waited for the picture's own time, not the others'
+    assert result["read_errors"] == [{"what": "screenshot", "frame": None}]
+    assert result["has_screenshot"] is False
 
 
 @pytest.mark.asyncio

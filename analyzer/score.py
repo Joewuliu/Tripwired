@@ -47,6 +47,8 @@ SUSPICIOUS_AT = 30
 # refusal to open a private address says nothing about the site.
 HIDES = {"unresolved", "unreachable", "gone", "refused", "bot_check", "blank"}
 
+_REASON_IDS = {"hides_from_sandbox", "not_opened", "not_read", "not_finished"}  # the evidence ids _access can give
+
 COULDNT_CHECK = "Couldn't get a proper look at this link. Don't enter anything until you verify it another way."
 NO_RED_FLAGS = "No red flags found. That is not a guarantee."
 
@@ -57,6 +59,7 @@ _ASKS_FOR = {
     "bank": "bank account details",
     "otp": "a one-time code",
     "pin": "a PIN",
+    "seed": "a wallet recovery phrase",
 }
 
 _ACCESS = {  # kind -> (sentence, source)
@@ -69,7 +72,9 @@ _ACCESS = {  # kind -> (sentence, source)
     "blank": ("The page opened but showed nothing (page scan)", "Sandbox page scan"),
     # Not held against the site (it may just be heavy), but never reported as a clean page either.
     "unreadable": ("Part of the page could not be read: {detail} (page scan)", "Sandbox page scan"),
+    "unfinished": ("The page had not finished loading when its time was up, and {detail} (page scan)", "Sandbox page scan"),
 }
+_NOT_COUNTED = {"unreadable": "not_read", "unfinished": "not_finished"}  # shown, worth nothing
 
 
 @dataclass(frozen=True)
@@ -110,10 +115,16 @@ def _access(access: dict | None) -> list[Evidence]:
     if not access:
         return []
     sentence, source = _ACCESS[access["kind"]]
-    rule_id = "hides_from_sandbox" if access["kind"] in HIDES else "not_opened"
-    if access["kind"] == "unreadable":
-        rule_id = "not_read"
+    rule_id = _NOT_COUNTED.get(access["kind"]) or ("hides_from_sandbox" if access["kind"] in HIDES else "not_opened")
     return [_item(rule_id, defang_text(sentence.format(detail=access["detail"])), source)]  # a frame's host is a link
+
+
+def _partial(scan) -> list[Evidence]:
+    """A page still loading when its time was up, but seen well enough to judge: say it was partial."""
+    if scan.access is not None or scan.opened.get("complete", True):
+        return []
+    return [_item("partial_page", "The page was slow to finish loading, so only part of it was checked (page scan)",
+                  "Sandbox page scan", 0)]
 
 
 def _warning(warning: str | None) -> list[Evidence]:
@@ -239,13 +250,12 @@ def _fields(fields: list[dict], brand_names: list[str], age_days: int | None, fr
 # --- putting it together ----------------------------------------------------------------------
 
 def _uninspected(scan) -> bool:
-    """True when we saw too little of the page to say anything reassuring about it."""
-    if scan.access:
-        return True
-    opened = scan.opened
-    unfinished = not opened.get("complete", True)
-    nothing_seen = not opened.get("has_screenshot", True) or not (opened.get("text") or "").strip()
-    return unfinished and nothing_seen
+    """True when we saw too little of the page to say anything reassuring about it.
+
+    access.judge_access is the only judge of that. There is deliberately no second test here: a page
+    could then be "couldn't check" with no evidence line saying why (it happened, on usps.com).
+    """
+    return scan.access is not None
 
 
 def _order(item: Evidence) -> tuple[int, int]:
@@ -274,6 +284,7 @@ def judge(scan) -> Judgement:
 
     items = (
         _access(scan.access)
+        + _partial(scan)
         + _warning(scan.warning)
         + _feeds(scan.feeds)
         + _brands(scan.brand, official)
@@ -305,6 +316,10 @@ def judge(scan) -> Judgement:
         verdict = "suspicious"
     else:
         verdict = "couldnt_check" if uninspected else "no_red_flags"
+    if verdict == "couldnt_check":
+        # Why we could not check is the point of the message: it leads, ahead of any discount, so a
+        # phone reply (three bullets) and the report both open with it.
+        items.sort(key=lambda e: e.id not in _REASON_IDS)
 
     return Judgement(
         verdict=verdict,

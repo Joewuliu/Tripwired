@@ -117,8 +117,18 @@ def test_a_finished_page_with_nothing_on_it_is_blank():
     assert kind(title=None, text="") == "blank"
 
 
-def test_a_page_still_loading_is_not_called_blank():
-    assert judge_access(page(complete=False, title="", text="")) is None
+def test_a_page_still_loading_is_not_called_blank_but_is_called_unfinished():
+    result = judge_access(page(complete=False, title="", text=""))
+    assert result == {"kind": "unfinished", "detail": "no text had arrived"}
+
+
+def test_an_unfinished_page_with_text_but_no_screenshot_says_which_is_missing():
+    result = judge_access(page(complete=False, has_screenshot=False))
+    assert result == {"kind": "unfinished", "detail": "no screenshot could be taken"}
+
+
+def test_an_unfinished_page_with_text_and_a_screenshot_is_judged_on_what_was_seen():
+    assert judge_access(page(complete=False, has_screenshot=True)) is None
 
 
 def test_a_page_with_only_a_title_is_not_blank():
