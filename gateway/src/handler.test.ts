@@ -55,7 +55,7 @@ test("acknowledgment first, then the screenshot, then the verdict", async () => 
 test("the verdict message ends with the report link when PUBLIC_URL is given", async () => {
   const { out, sent } = recorder();
   await handleInbound({ kind: "text", text: "https://example.com" }, out, fakeAnalyzer(), "https://host.example");
-  assert.ok(sent.at(-1)!.endsWith("\n\nFull report: https://host.example/api/report/abc123abc123"));
+  assert.ok(sent.at(-1)!.endsWith("\n\nFull report: https://host.example/r/abc123abc123"));
 });
 
 test("there is no report line, and nothing breaks, without PUBLIC_URL", async () => {

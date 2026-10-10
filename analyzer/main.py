@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, StringConstraints
 
@@ -14,6 +14,7 @@ from contract import AnalysisResult, BrandMatch, Hop
 from defang import defang, defang_text
 from env import load_root_env
 from pipeline import scan
+from public_check import RateLimiter, normalize
 from reports import load_report, save_report
 from score import judge
 
@@ -26,6 +27,7 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 SCAN_ID = re.compile(r"[a-f0-9]{12}")
 
 app = FastAPI(title="Tripwire analyzer")
+_public_limit = RateLimiter()
 
 
 def _reports_dir() -> Path:
@@ -47,9 +49,7 @@ def _brand_match(brand_findings: list[dict]) -> BrandMatch | None:
     )
 
 
-@app.post("/analyze", response_model=AnalysisResult)
-async def analyze(request: AnalyzeRequest) -> AnalysisResult:
-    url = request.urls[0]
+async def _scan_and_store(url: str) -> AnalysisResult:
     scan_id = secrets.token_hex(6)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     result = await scan(url, DATA_DIR / f"{scan_id}.png")
@@ -80,6 +80,41 @@ async def analyze(request: AnalyzeRequest) -> AnalysisResult:
     except Exception as exc:  # a full disk must cost the report link, not the verdict
         log.error("report %s was not saved: %s", scan_id, type(exc).__name__)
     return analysis
+
+
+@app.post("/analyze", response_model=AnalysisResult)
+async def analyze(request: AnalyzeRequest) -> AnalysisResult:
+    return await _scan_and_store(request.urls[0])
+
+
+class CheckRequest(BaseModel):
+    url: str = Field(min_length=1, max_length=2048)
+
+
+class CheckResponse(BaseModel):
+    id: str
+
+
+def _visitor(request: Request) -> str:
+    """Who is asking. Caddy is the only way in and sets X-Forwarded-For; its last entry is the one
+    Caddy itself saw, so a visitor cannot pick their own bucket by sending the header."""
+    forwarded = request.headers.get("x-forwarded-for", "")
+    last = forwarded.split(",")[-1].strip()
+    return last or (request.client.host if request.client else "unknown")
+
+
+@app.post("/api/check", response_model=CheckResponse)
+async def check(body: CheckRequest, request: Request) -> CheckResponse:
+    """The public paste-a-link route: one address in, the report id out (the page then opens
+    /r/<id>). Narrow on purpose: it returns nothing but the id and is rate-limited."""
+    url = normalize(body.url)
+    if url is None:
+        raise HTTPException(status_code=422, detail="not a web address")
+    wait = _public_limit.take(_visitor(request))
+    if wait is not None:
+        raise HTTPException(status_code=429, headers={"Retry-After": str(int(wait) + 1)})
+    result = await _scan_and_store(url)
+    return CheckResponse(id=result.id)
 
 
 @app.get("/api/report/{report_id}", response_model=AnalysisResult)

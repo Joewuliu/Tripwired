@@ -120,9 +120,9 @@ const HOST = "https://34-123-45-67.sslip.io";
 
 test("the report link is added, and is the only link that stays tappable", () => {
   const reply = formatReply(result(), HOST);
-  assert.ok(reply.endsWith(`\n\nFull report: ${HOST}/api/report/abc123abc123`));
+  assert.ok(reply.endsWith(`\n\nFull report: ${HOST}/r/abc123abc123`));
   const live = reply.match(/https?:\/\/\S+/g) ?? [];
-  assert.deepEqual(live, [`${HOST}/api/report/abc123abc123`]);
+  assert.deepEqual(live, [`${HOST}/r/abc123abc123`]);
 });
 
 test("the reply is unchanged when there is no PUBLIC_URL", () => {
@@ -132,11 +132,11 @@ test("the reply is unchanged when there is no PUBLIC_URL", () => {
 });
 
 test("the report link is built only from PUBLIC_URL and a 12-hex id", () => {
-  assert.equal(reportLink(HOST, "abc123abc123"), `${HOST}/api/report/abc123abc123`);
-  assert.equal(reportLink(`${HOST}/`, "abc123abc123"), `${HOST}/api/report/abc123abc123`); // trailing slash
-  assert.equal(reportLink(`${HOST}/some/path?x=1`, "abc123abc123"), `${HOST}/api/report/abc123abc123`);
-  assert.equal(reportLink("https://user:secret@host.example", "abc123abc123"), "https://host.example/api/report/abc123abc123");
-  assert.equal(reportLink("http://localhost:8001", "abc123abc123"), "http://localhost:8001/api/report/abc123abc123");
+  assert.equal(reportLink(HOST, "abc123abc123"), `${HOST}/r/abc123abc123`);
+  assert.equal(reportLink(`${HOST}/`, "abc123abc123"), `${HOST}/r/abc123abc123`); // trailing slash
+  assert.equal(reportLink(`${HOST}/some/path?x=1`, "abc123abc123"), `${HOST}/r/abc123abc123`);
+  assert.equal(reportLink("https://user:secret@host.example", "abc123abc123"), "https://host.example/r/abc123abc123");
+  assert.equal(reportLink("http://localhost:8001", "abc123abc123"), "http://localhost:8001/r/abc123abc123");
 });
 
 test("no report link for an id the analyzer could have used to smuggle something in", () => {

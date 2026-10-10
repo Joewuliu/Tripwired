@@ -1,0 +1,9 @@
+# Context for deploy/caddy.Dockerfile (the repository root). Only web/ is used; keep the rest out.
+.git
+.env
+data
+analyzer
+gateway
+**/node_modules
+**/dist
+**/.venv

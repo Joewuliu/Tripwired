@@ -398,13 +398,24 @@ Expected: a file size, then `404` (the analyze endpoint is not on the internet).
 **From your phone**, with the laptop gateway stopped: text the Photon line a benign link such as
 `https://example.com`. Close the laptop: it must still answer.
 
-**The report link.** The reply ends with `Full report: https://<your-host>.sslip.io/api/report/<id>`.
+**The report link.** The reply ends with `Full report: https://<your-host>.sslip.io/r/<id>`.
 It is the one tappable link Tripwire sends: everything about the scanned page is defanged. Tap it
-(or open it from the laptop) and you get that scan's result as JSON:
+and the report page opens: verdict, what to do, the screenshot, and the evidence. The page reads
+the scan as JSON from the same host; you can read that directly too:
 
 ```powershell
 Invoke-RestMethod https://34-123-45-67.sslip.io/api/report/<id> | Select-Object verdict, score, headline
 Invoke-RestMethod https://34-123-45-67.sslip.io/api/report/000000000000    # 404: no such report
+```
+
+The home page (`https://<your-host>.sslip.io/`) has a paste-a-link box for phones that cannot
+text the line. It calls `POST /api/check`, which takes one address, returns only the report id, and
+allows 10 checks an hour per visitor and 60 an hour overall (in `analyzer/public_check.py`). Test it
+from the laptop (about 20 seconds); `/analyze` is still not reachable from the internet:
+
+```powershell
+Invoke-RestMethod -Method Post -Uri https://34-123-45-67.sslip.io/api/check -ContentType 'application/json' -Body '{"url":"example.com"}'
+Invoke-WebRequest -Method Post -Uri https://34-123-45-67.sslip.io/analyze -ContentType 'application/json' -Body '{"urls":["https://example.com"]}'   # 404 (the web app's page, not the analyzer)
 ```
 
 If the reply has no `Full report` line, the gateway has no `PUBLIC_URL`: `docker compose up -d`

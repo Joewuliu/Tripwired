@@ -53,7 +53,7 @@ export function defangText(text: string): string {
   return out;
 }
 
-const REPORT_PATH = "/api/report"; // moves to "/r" when the report page is served from the same host
+const REPORT_PATH = "/r"; // the report page, served from the same host as the API
 const REPORT_ID = /^[a-f0-9]{12}$/;
 
 /**

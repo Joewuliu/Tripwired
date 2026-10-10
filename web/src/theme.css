@@ -1,0 +1,66 @@
+/* The look of the whole site, as variables. Colours, glass, shape and type are set here and
+   nowhere else: index.css only uses these names. To restyle Tripwire, edit this file.
+
+   Frutiger Aero: a bright sky, glossy translucent panels, soft shadows, rounded corners. It is made
+   from CSS gradients alone, so there are no image files to license or carry. */
+:root {
+  /* Sky behind everything */
+  --sky-top: #7cc7ee;
+  --sky-mid: #c9ecf8;
+  --sky-bottom: #eaf8e4;
+  --sky-glow: rgba(255, 255, 255, 0.85);
+
+  /* Text */
+  --ink: #12304a;
+  --muted: #4a6a82;
+  --on-colour: #ffffff;
+
+  /* Glass panels */
+  --glass: rgba(255, 255, 255, 0.62);
+  --glass-strong: rgba(255, 255, 255, 0.82);
+  --glass-edge: rgba(255, 255, 255, 0.9);
+  --glass-line: rgba(18, 48, 74, 0.14);
+  --glass-blur: 14px;
+  --glass-shine: linear-gradient(180deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0) 48%);
+  --shadow: 0 8px 24px rgba(18, 82, 130, 0.18), 0 1px 2px rgba(18, 82, 130, 0.2);
+  --shadow-soft: 0 3px 10px rgba(18, 82, 130, 0.14);
+
+  /* Shape */
+  --radius: 18px;
+  --radius-small: 10px;
+  --radius-pill: 999px;
+
+  /* Accent and links. Aqua, not green: the clean verdict is not a promise of safety. */
+  --accent: #1688d9;
+  --accent-deep: #0b5fa8;
+  --accent-light: #3aa6e8;
+  --focus: #ffb000;
+
+  /* Verdicts: each has a base colour and a lighter top for the glossy badge */
+  --dangerous: #c62828;
+  --dangerous-light: #ef6b5f;
+  --suspicious: #b36b00;
+  --suspicious-light: #f2b13c;
+  --clear: #0b6fb8;
+  --clear-light: #4bb4ea;
+  --unknown: #536b7d;
+  --unknown-light: #93a9b8;
+
+  /* Notices */
+  --note-bg: rgba(255, 244, 205, 0.9);
+  --note-line: #e3c96a;
+  --error-bg: rgba(255, 226, 222, 0.92);
+  --error-line: #e58a82;
+
+  /* Type */
+  --font: 'Frutiger', 'Frutiger LT Std', 'Myriad Pro', 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass: #ffffff;
+    --glass-strong: #ffffff;
+    --glass-blur: 0px;
+  }
+}

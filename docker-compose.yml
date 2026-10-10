@@ -52,7 +52,9 @@ services:
         ipv4_address: 172.30.0.11
 
   caddy:
-    image: caddy:2-alpine
+    build:
+      context: . # the repository root: the image compiles web/ and serves it
+      dockerfile: deploy/caddy.Dockerfile
     environment:
       SITE_HOST: ${SITE_HOST:?set SITE_HOST in .env (see deploy/DEPLOY.md)}
     ports:

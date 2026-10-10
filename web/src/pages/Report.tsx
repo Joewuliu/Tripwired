@@ -1,12 +1,36 @@
+import { useEffect, useState } from 'react'
+import { guidance } from '../actions.ts'
+import { fetchReport } from '../api.ts'
 import { parseReport } from '../contract.ts'
 import type { Report } from '../contract.ts'
+import { remember } from '../history.ts'
 import sampleJson from '../sample/report.sample.json'
 import { VERDICT_LABEL, VERDICT_NOTE } from '../verdict.ts'
+import { CheckBox } from './CheckBox.tsx'
 import { NotFound } from './NotFound.tsx'
 
-/** Reports of live scans arrive with the report API; until then only the bundled sample exists. */
-function loadReport(id: string): Report | null {
-  return id === 'sample' ? parseReport(sampleJson) : null
+type Load = { kind: 'loading' } | { kind: 'ready'; report: Report } | { kind: 'missing' } | { kind: 'error'; message: string }
+
+/** /r/sample is the bundled example; every other id is fetched from the report API on this host. */
+function useReport(id: string): Load {
+  const [load, setLoad] = useState<Load>(() =>
+    id === 'sample' ? { kind: 'ready', report: parseReport(sampleJson) } : { kind: 'loading' },
+  )
+  useEffect(() => {
+    if (id === 'sample') return
+    const controller = new AbortController()
+    fetchReport(id, fetch, controller.signal).then((result) => {
+      if (controller.signal.aborted) return
+      if (result.kind === 'ok') {
+        remember(result.report)
+        setLoad({ kind: 'ready', report: result.report })
+      } else {
+        setLoad(result)
+      }
+    })
+    return () => controller.abort()
+  }, [id])
+  return load
 }
 
 function signed(points: number): string {
@@ -23,34 +47,132 @@ function appliedRules(report: Report): Set<string> {
   return applied
 }
 
-export function ReportPage({ id }: { id: string }) {
-  const report = loadReport(id)
-  if (!report) {
-    return <NotFound message="That report isn't available." />
+function CopyLink() {
+  const [copied, setCopied] = useState(false)
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      setCopied(true)
+    } catch {
+      setCopied(false) // clipboard blocked: the address bar still has the link
+    }
   }
+  return (
+    <button type="button" className="button" onClick={copy}>
+      {copied ? 'Copied' : 'Copy this report link'}
+    </button>
+  )
+}
+
+function WhatToDo({ report }: { report: Report }) {
+  const { steps, reportButtons } = guidance(report.verdict, report.brand_match?.official_domain_defanged ?? null)
+  return (
+    <section className="glass what-to-do">
+      <h2>What to do</h2>
+      <ol>
+        {steps.map((step) => (
+          <li key={step}>{step}</li>
+        ))}
+      </ol>
+      <div className="buttons">
+        {reportButtons.map((button) => (
+          <a key={button.href} className="button" href={button.href} rel="noreferrer noopener" target={button.href.startsWith('sms:') ? undefined : '_blank'}>
+            {button.label}
+          </a>
+        ))}
+        <CopyLink />
+        <a className="button" href="/">
+          Check another link
+        </a>
+      </div>
+    </section>
+  )
+}
+
+export function ReportPage({ id }: { id: string }) {
+  const load = useReport(id)
+  if (load.kind === 'loading') {
+    return (
+      <main className="page">
+        <p className="eyebrow">Tripwire report</p>
+        <p role="status" className="glass">
+          Loading the report&hellip;
+        </p>
+      </main>
+    )
+  }
+  if (load.kind === 'missing') {
+    return <NotFound message="That report isn't available. It may be old, or the link may be mistyped." />
+  }
+  if (load.kind === 'error') {
+    return (
+      <main className="page">
+        <p className="eyebrow">Tripwire report</p>
+        <h1>We couldn&apos;t load this report.</h1>
+        <p className="notice error" role="alert">
+          {load.message}
+        </p>
+        <p>
+          <a href="">Try again</a> &middot; <a href="/">Back to the start</a>
+        </p>
+      </main>
+    )
+  }
+
+  const { report } = load
   const applied = appliedRules(report)
   const note = VERDICT_NOTE[report.verdict]
+  const why = report.verdict === 'couldnt_check' ? report.evidence[0] : undefined
+  // Dangerous and suspicious headlines already lead with the top observation.
+  const lines = report.observations.filter((line) => !report.headline.endsWith(line) && line !== why?.label).slice(0, 3)
 
   return (
     <main className="page">
-      <header className="report-header">
+      <header className={`glass report-header verdict-${report.verdict}`}>
         <p className="eyebrow">Tripwire report</p>
         {id === 'sample' && (
-          <p className="sample-note">Example report. The page is made up; the findings and points are what Tripwire's scorer produces for it.</p>
+          <p className="notice">Example report. The page is made up; the findings and points are what Tripwire&apos;s scorer produces for it.</p>
         )}
         <p className={`badge badge-${report.verdict}`}>{VERDICT_LABEL[report.verdict]}</p>
         <h1>{report.headline}</h1>
+        {why && (
+          <p className="why">
+            <strong>Why we couldn&apos;t check:</strong> {why.label}
+          </p>
+        )}
         {note && <p className="verdict-note">{note}</p>}
+        {lines.length > 0 && (
+          <ul className="lines">
+            {lines.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        )}
+        <p className="link-line">
+          Link: <code>{report.url_defanged}</code>
+        </p>
       </header>
 
+      <WhatToDo report={report} />
+
       {report.screenshot_url && (
-        <figure className="shot">
+        <figure className="shot glass">
           <img src={report.screenshot_url} alt="What the sandbox saw when it opened the link, as a phone" />
           <figcaption>What the sandbox saw, in a phone-sized browser.</figcaption>
         </figure>
       )}
 
-      <section>
+      {report.brand_match && (
+        <section className="glass">
+          <h2>Who it looks like</h2>
+          <p>
+            The address imitates <strong>{report.brand_match.brand}</strong>. The real site is{' '}
+            <code>{report.brand_match.official_domain_defanged}</code>.
+          </p>
+        </section>
+      )}
+
+      <section className="glass">
         <h2>What we found</h2>
         {report.evidence.length === 0 ? (
           <p>No evidence recorded for this scan.</p>
@@ -89,7 +211,7 @@ export function ReportPage({ id }: { id: string }) {
         </p>
       </section>
 
-      <section>
+      <section className="glass">
         <h2>How the score is worked out</h2>
         <p>This is the whole table Tripwire uses. The rows in bold are the ones that applied to this scan.</p>
         <div className="table-wrap">
@@ -118,7 +240,7 @@ export function ReportPage({ id }: { id: string }) {
         </div>
       </section>
 
-      <section>
+      <section className="glass">
         <h2>Where the link went</h2>
         <ol className="hops">
           {report.redirects_defanged.map((hop, i) => (
@@ -128,9 +250,10 @@ export function ReportPage({ id }: { id: string }) {
           ))}
         </ol>
         {report.redirects_defanged.length === 0 && <p>The link was not opened.</p>}
+        <p className="fineprint">Addresses are shown defanged (hxxps, [.]) so they cannot be tapped by accident.</p>
       </section>
 
-      <p className="fineprint">Addresses are shown defanged (hxxps, [.]) so they cannot be tapped by accident.</p>
+      <CheckBox label="Check another link" />
     </main>
   )
 }
