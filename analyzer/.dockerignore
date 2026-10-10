@@ -3,5 +3,6 @@ __pycache__
 *.pyc
 .pytest_cache
 test_*.py
+conftest.py
 pytest.ini
 requirements-dev.txt

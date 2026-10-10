@@ -10,7 +10,11 @@ from pydantic import BaseModel, Field, StringConstraints
 
 from contract import AnalysisResult, Hop
 from defang import defang, defang_text
-from sandbox import open_page
+from env import load_root_env
+from observations import describe
+from pipeline import scan
+
+load_root_env()  # API keys for the threat feeds live in the repo-root .env
 
 PORT = 8001
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -39,7 +43,8 @@ async def analyze(request: AnalyzeRequest) -> AnalysisResult:
     url = request.urls[0]
     scan_id = secrets.token_hex(6)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    opened = await open_page(url, DATA_DIR / f"{scan_id}.png")
+    result = await scan(url, DATA_DIR / f"{scan_id}.png")
+    opened = result.opened
     verdict, headline, observations = _summary(opened)
     return AnalysisResult(
         id=scan_id,
@@ -47,8 +52,8 @@ async def analyze(request: AnalyzeRequest) -> AnalysisResult:
         verdict=verdict,
         score=None,
         headline=headline,
-        observations=observations,
-        evidence=[],  # filled in by the evidence and scoring steps
+        observations=observations + describe(result.feeds, result.age),
+        evidence=[],  # filled in by the scoring step
         points_table=[],
         brand_match=None,
         url_defanged=defang(url),

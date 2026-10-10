@@ -1,0 +1,74 @@
+"""One scan: open the page, and gather what can be learned about the link while it loads."""
+import asyncio
+from dataclasses import dataclass
+from pathlib import Path
+from urllib.parse import urlsplit
+
+from enrich import domain_age
+from feeds import check_feeds, failed, merge_results
+from platforms import is_free_host
+from sandbox import open_page
+
+FEED_BUDGET_S = 3.0  # most a scan waits on threat feeds once the page itself is done
+
+
+@dataclass
+class Scan:
+    url: str  # what was asked for
+    final_url: str  # where the browser ended up (the url itself if it never loaded)
+    opened: dict  # sandbox.open_page's result
+    feeds: list[dict]  # feeds.check_feeds entries, merged over the original url and the redirect chain
+    age: dict  # enrich.domain_age's result
+
+
+def _url_key(url: str) -> str:
+    """So https://example.com and https://example.com/ count as the same URL."""
+    parts = urlsplit(url)
+    return f"{parts.scheme.lower()}://{(parts.hostname or '').lower()}:{parts.port or ''}{parts.path or '/'}?{parts.query}"
+
+
+def unchecked_chain(original: str, opened: dict) -> list[str]:
+    """Redirect hops and the final URL that the check on the original URL did not cover."""
+    chain = [hop["url"] for hop in opened["redirects"]]
+    if opened["final_url"]:
+        chain.append(opened["final_url"])
+    seen = {_url_key(original)}
+    fresh = []
+    for url in chain:
+        if _url_key(url) not in seen:
+            seen.add(_url_key(url))
+            fresh.append(url)
+    return fresh
+
+
+async def _wait_for_feeds(task: asyncio.Task) -> list[dict]:
+    try:
+        return await asyncio.wait_for(asyncio.shield(task), FEED_BUDGET_S)
+    except TimeoutError:
+        task.cancel()
+        return failed("TimeoutError")
+
+
+async def _age(host: str) -> dict:
+    if is_free_host(host):  # the platform's age says nothing about one person's page on it
+        return {"domain": host, "registered": None, "age_days": None, "source": "RDAP", "error": "free hosting platform"}
+    return await domain_age(host)
+
+
+async def scan(url: str, shot_path: Path) -> Scan:
+    feeds_task = asyncio.create_task(check_feeds([url]))  # runs while the page loads
+    try:
+        opened = await open_page(url, shot_path)
+    except BaseException:
+        feeds_task.cancel()
+        raise
+    first_feeds = await _wait_for_feeds(feeds_task)
+
+    final_url = opened["final_url"] or url
+    later_urls = unchecked_chain(url, opened)
+
+    async def later_feeds() -> list[dict]:
+        return await check_feeds(later_urls, timeout=FEED_BUDGET_S) if later_urls else []
+
+    chain_feeds, age = await asyncio.gather(later_feeds(), _age(urlsplit(final_url).hostname or ""))
+    return Scan(url=url, final_url=final_url, opened=opened, feeds=merge_results(first_feeds, chain_feeds), age=age)
