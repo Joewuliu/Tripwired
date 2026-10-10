@@ -60,6 +60,12 @@ test("a message with no link gets the how-to reply and nothing is analyzed", asy
   assert.deepEqual(analyzer.asked, []);
 });
 
+test("text with a picture but no link says image checking is coming soon", async () => {
+  const { out, sent } = recorder();
+  await handleInbound({ kind: "text", text: "is this real?", hasImage: true }, out, fakeAnalyzer());
+  assert.deepEqual(sent, [`text:${IMAGE_SOON}`]);
+});
+
 test("an image says it is coming soon", async () => {
   const { out, sent } = recorder();
   await handleInbound({ kind: "image" }, out, fakeAnalyzer());

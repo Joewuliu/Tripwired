@@ -3,7 +3,10 @@ import { ANALYZER_DOWN, IMAGE_SOON, NO_URL, ONE_AT_A_TIME, OPENING, defangText, 
 import { extractUrls } from "./urls";
 
 /** What a message boils down to, whatever platform it came from. */
-export type Inbound = { kind: "text"; text: string } | { kind: "image" } | { kind: "ignore" };
+export type Inbound =
+  | { kind: "text"; text: string; hasImage?: boolean } // hasImage: a picture came along with the text
+  | { kind: "image" }
+  | { kind: "ignore" };
 
 /** The only two things the gateway ever sends. */
 export interface Outbox {
@@ -35,7 +38,7 @@ export async function handleInbound(
   if (inbound.kind === "image") return out.sendText(IMAGE_SOON);
 
   const urls = extractUrls(inbound.text);
-  if (urls.length === 0) return out.sendText(NO_URL);
+  if (urls.length === 0) return out.sendText(inbound.hasImage ? IMAGE_SOON : NO_URL);
 
   console.log(`checking ${defangText(urls[0])}`);
   await out.sendText(OPENING);
