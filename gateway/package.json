@@ -1,13 +1,19 @@
 {
-  "name": "gateway",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "tripwire-gateway",
+  "private": true,
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "tsx src/index.ts",
+    "test": "node --import tsx --test src/*.test.ts",
+    "typecheck": "tsc --noEmit"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs"
+  "dependencies": {
+    "linkifyjs": "^4.3.3",
+    "spectrum-ts": "^12.10.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.2"
+  }
 }
