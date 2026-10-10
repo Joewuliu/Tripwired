@@ -17,7 +17,7 @@ export function ScanInput({ mode, submit, starting, disabled, retentionDays, ret
         <button className="button button-primary scan-submit" disabled={starting || disabled || retrySeconds > 0} type="submit">{starting ? <><LoaderCircle size={17} className="spin" />Starting scan…</> : retrySeconds > 0 ? `Try again in ${retrySeconds}s` : <>Scan link<ArrowUpRight size={18} aria-hidden="true" /></>}</button>
       </div>
       {error && <p className="inline-error" id="url-error" role="alert">{error}</p>}
-      <p id="url-helper" className="input-helper"><LockKeyhole size={13} aria-hidden="true" />Tripwire opens the link on its scanning server. Results cannot guarantee a site is safe.</p>
+      <p id="url-helper" className="input-helper"><LockKeyhole size={13} aria-hidden="true" />PhishFinder opens the link on its scanning server. Results cannot guarantee a site is safe.</p>
       <p id="url-disclosure" className="disclosure">{mode === 'demo' ? 'Demo submissions play illustrative findings only. No link is visited or sent to providers. Display values stay in this browser until you reset the demo.' : `The server visit may notify the site operator. URL or domain data may be shared with configured threat-intelligence providers.${retentionDays ? ` Reports and captures are retained for ${retentionDays} days.` : ' Retention is provided when the analyzer connects.'}`}</p>
     </form>
   </section>;

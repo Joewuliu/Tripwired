@@ -2,7 +2,7 @@ import type { ScanCheck, ScanDetail, InputType, Verdict } from '../types/scan';
 import { defangUrl } from '../utils/defang';
 
 export const checkLabels = ['Official domain comparison', 'Domain registration age', 'Google Safe Browsing', 'Threat intelligence feeds', 'Page & sensitive form review', 'Visual brand comparison'];
-const sources = ['Tripwire verified brand catalog', 'RDAP', 'Google Safe Browsing', 'URLhaus / OpenPhish', 'Tripwire sandbox', 'Visual reference catalog'];
+const sources = ['PhishFinder verified brand catalog', 'RDAP', 'Google Safe Browsing', 'URLhaus / OpenPhish', 'PhishFinder sandbox', 'Visual reference catalog'];
 const captureTime = '2026-10-04T15:30:00.000Z';
 
 export function fixture(id: string, raw: string, headline: string, verdict: Verdict | null, score: number | null, ageHours: number, inputType: InputType = 'url', partial = false): ScanDetail {

@@ -4,7 +4,7 @@ import { formatDate } from './time';
 export const verdictLabels = { dangerous: 'Dangerous', suspicious: 'Suspicious', no_red_flags: 'No red flags found' };
 export function reportText(scan: ScanDetail): string {
   return [
-    'Tripwire scan report', scan.isRecorded ? 'Recorded demo - no live scan. Findings are illustrative.' : '',
+    'PhishFinder scan report', scan.isRecorded ? 'Recorded demo - no live scan. Findings are illustrative.' : '',
     `Scanned: ${formatDate(scan.submittedAt)}`,
     `Submitted link: ${defangUrl(scan.submittedUrlDisplay || 'URL extraction pending')}`,
     scan.finalUrlDisplay ? `Observed destination: ${defangUrl(scan.finalUrlDisplay)}` : '',

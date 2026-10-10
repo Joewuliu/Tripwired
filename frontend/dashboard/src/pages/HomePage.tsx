@@ -7,7 +7,7 @@ import { ApiError, createScan, exchangeCapability, getHistory, getSession, resca
 import { demoCreate, demoHistory, resetDemo } from '../demo/store';
 import { defaultFilters, readFilters, serializeFilters } from '../utils/filters';
 import { normalizeInput, refangForRescan } from '../utils/defang';
-import { TripwireHeader } from '../components/TripwireHeader';
+import { PhishFinderHeader } from '../components/PhishFinderHeader';
 import { ScanInput } from '../components/ScanInput';
 import { ScanFilters } from '../components/ScanFilters';
 import { ScanList } from '../components/ScanList';
@@ -154,7 +154,7 @@ export function HomePage() {
     <div className="aero-landscape" aria-hidden="true" />
     <a className="skip-link" href="#recent-scans-title">Skip to recent scans</a>
     <main className="home-shell">
-      <TripwireHeader mode={mode} connected={connected} />
+      <PhishFinderHeader mode={mode} connected={connected} />
       <div className="mode-bar"><div className="mode-note">{mode === 'demo' ? <FlaskConical size={15} /> : <ShieldCheck size={15} />}<span>{mode === 'demo' ? 'Recorded demo — no live scan' : 'Live scans · scoped to your session'}</span></div><div className="mode-switch" role="group" aria-label="Data mode"><button aria-pressed={mode === 'demo'} onClick={() => switchMode('demo')}><Sparkles size={13} />Demo</button><button aria-pressed={mode === 'live'} onClick={() => switchMode('live')}><Radio size={13} />Live</button></div></div>
       <ScanInput mode={mode} submit={submit} starting={starting} disabled={!ready} retentionDays={mode === 'live' ? session.data?.retentionDays || null : null} retrySeconds={Math.max(0, Math.ceil((retryUntil - clock) / 1000))} />
       <section className="history-panel glass-panel" aria-labelledby="recent-scans-title"><div className="history-heading"><div><h2 id="recent-scans-title" tabIndex={-1}>Recent scans <span className="count-orb">{total}</span></h2></div></div>

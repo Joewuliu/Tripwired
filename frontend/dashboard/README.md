@@ -1,6 +1,6 @@
-# Tripwire dashboard
+# PhishFinder dashboard
 
-The separate frontend MVP for Tripwire. All frontend files live in this `dashboard` folder. It follows the official specification's `frontend/src` structure with the user-requested root name `dashboard`, and excludes the removed redirect-chain UI.
+The separate frontend MVP for PhishFinder. All frontend files live in this `dashboard` folder. It follows the official specification's `frontend/src` structure with the user-requested root name `dashboard`, and excludes the removed redirect-chain UI.
 
 ## Start
 
@@ -30,10 +30,10 @@ npm run test:browser
 
 ## What works
 
-- Original `wallpaper2.jpg` background, `globe.png` logo, and Vista risk icons from `Joewuliu/Tripwired` on `main`, with glossy scan rows, glass controls, and exact creator credit. The wallpaper fills the frame proportionally without stretching. Decorative sky overlays and added slogans are removed.
+- Original `wallpaper2.jpg` background, `clownfish.png` logo, and Vista risk icons from `Joewuliu/Tripwired` on `main`, with glossy scan rows, glass controls, and exact creator credit. The wallpaper fills the frame proportionally without stretching. Decorative sky overlays and added slogans are removed.
 - Compact URL submission with validation and inline errors. Suspect websites are never visited by this frontend.
 - History search, time/risk/input/status filters combined with AND, five sort orders, 20-item pagination, URL-persisted filters, and first-page refresh while the tab is visible.
-- Report routes at `/r/:scanId`, browser Back/Forward, hard refresh, native modal background isolation, explicit keyboard focus containment, Escape, and focus/scroll restoration. Reports use a distinct sea-glass green tint with a 16px blurred backdrop and an opaque fallback when blur is unsupported.
+- Report routes at `/r/:scanId`, browser Back/Forward, hard refresh, native modal background isolation, explicit keyboard focus containment, Escape, and focus/scroll restoration. Reports use a lighter translucent Frutiger blue tint with a 16px blurred backdrop and an opaque fallback when blur is unsupported.
 - Screenshot rail, enlarged raster view, capture timestamps and source, unavailable/expired states, non-clickable full defanged URLs, ordered check findings, evidence disclosures, partial/unknown/failed results, and score/coverage provenance.
 - Parallel analyzer results presented in order, up to 1.5 seconds of educational pacing, reduced-motion bypass, and immediate provisional danger warnings.
 - Final summary, recommended actions, copy-to-clipboard with manual fallback, FTC handoff to the fixed official destination, and server-backed rescan adapter.
@@ -57,7 +57,7 @@ dashboard/
     app/App.tsx, router.tsx
     pages/HomePage.tsx
     components/
-      TripwireHeader.tsx, ScanInput.tsx, ScanFilters.tsx
+      PhishFinderHeader.tsx, ScanInput.tsx, ScanFilters.tsx
       ScanList.tsx, ScanBubble.tsx, RiskBadge.tsx
       ReportDialog.tsx, CheckTimeline.tsx, CheckCard.tsx
       ScreenshotPanel.tsx, ReportSummary.tsx, FtcHandoff.tsx

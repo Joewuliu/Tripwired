@@ -24,7 +24,7 @@ The official component names and `src` grouping are preserved. The outer `fronte
 
 The initial desktop composition was inspected at 1440×900. The October 10 design refinement was visually inspected at the in-app browser's native desktop size and at 390×844; updated screenshots are in `docs/previews`. The compact input keeps five complete scan rows in the desktop initial view. Browser overflow and modal focus were tested at 320×740. Reduced motion removes animation and result pacing. Text is on mostly opaque surfaces; risk labels always include text and icons. A complete manual screen-reader pass remains a pre-production check.
 
-The latest user request overrides the original recognizable-homepage backdrop: the report now uses 16px blur, dimming, and desaturation. Its green glass tint distinguishes it from the blue homepage without changing semantic risk colors. Scan rows and decorative bubbles have stronger rims, reflections, and depth. The slogan above the title is removed. Mode controls, reset, and evidence disclosure targets have a 44px minimum height; placeholder and input-edge contrast were strengthened.
+The latest user request overrides the original recognizable-homepage backdrop: the report now uses 16px blur, dimming, and desaturation. Its pale blue glass and glossy toolbar distinguish it from the homepage without changing semantic risk colors. Scan rows and decorative bubbles have stronger rims, reflections, and depth. The slogan above the title is removed. Mode controls, reset, and evidence disclosure targets have a 44px minimum height; placeholder and input-edge contrast were strengthened.
 
 ## Server responsibilities remain outside this UI delivery
 
@@ -47,3 +47,9 @@ npm run test:browser
 ```
 
 Browser tests require installed Playwright Chromium or `PLAYWRIGHT_CHROMIUM_EXECUTABLE`. The test suite intentionally covers user flows, privacy boundaries, error behavior, and API interactions rather than merely mirroring component markup.
+
+Current refinement: pale blue translucent reports replace the green tint. All five filters now open rounded glass menus with selected states, arrow-key navigation, Escape, outside-click dismissal, and viewport clamping. The header uses the original clownfish.png from frontend/icons on the dashboard branch.
+
+Validation for the current refinement: production build and all 15 browser tests passed. Desktop and 390px phone report/menu views were inspected; the menu test also verifies all five popups stay within 320px viewport bounds.
+
+Brand update: every customer-facing name is PhishFinder, including the browser title, error pages, provider labels and exported reports. The rounded Fredoka wordmark uses a blue glossy tint. History rows begin with the existing risk badge; input-type icons are removed. The shared row component applies to both demo and live data. Existing API source identifiers and the demo storage key remain compatible.

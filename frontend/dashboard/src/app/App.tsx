@@ -7,7 +7,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
   render() {
-    if (this.state.failed) return <main className="not-found glass-panel"><h1>Tripwire needs a refresh</h1><p>The interface could not display this page. Your server scans are unaffected.</p><button className="button" onClick={() => window.location.reload()}>Reload page</button></main>;
+    if (this.state.failed) return <main className="not-found glass-panel"><h1>PhishFinder needs a refresh</h1><p>The interface could not display this page. Your server scans are unaffected.</p><button className="button" onClick={() => window.location.reload()}>Reload page</button></main>;
     return this.props.children;
   }
 }

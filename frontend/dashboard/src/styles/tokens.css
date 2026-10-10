@@ -23,10 +23,10 @@
   --green-fill: #e2f4e9;
   --unknown: #465264;
   --unknown-fill: #edf1f5;
-  --report-surface: #eef8f2;
-  --report-rim: #6aa5a5;
-  --report-toolbar-top: #d9eeeb;
-  --report-toolbar-bottom: #b9dadd;
+  --report-surface: #edf8ff;
+  --report-rim: #73aac5;
+  --report-toolbar-top: #e0f3ffcc;
+  --report-toolbar-bottom: #aed7efaa;
   --report-backdrop-blur: 16px;
   --mono: 'Cascadia Code', Consolas, 'SFMono-Regular', monospace;
 }
