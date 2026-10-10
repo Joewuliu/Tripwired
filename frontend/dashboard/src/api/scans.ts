@@ -17,7 +17,7 @@ async function request<T>(path: string, schema: ZodType<T>, signal?: AbortSignal
     const payload = await response.json().catch(() => null);
     const retryHeader = response.headers.get('Retry-After');
     const delay = retryHeader ? (/^\d+$/.test(retryHeader) ? Number(retryHeader) : Math.max(0, Math.ceil((Date.parse(retryHeader) - Date.now()) / 1000))) : Number(payload?.error?.retryAfterSeconds || 0);
-    const known: Record<number, string> = { 401: 'Your session has expired. Start a new session to continue.', 403: 'This action is not authorized for your current session.', 404: 'This report is unavailable or the link has expired.', 410: 'This report is unavailable or the link has expired.', 429: 'Too many scans. Please wait before trying again.', 503: 'The analyzer is unavailable. Please try again later.' };
+    const known: Record<number, string> = { 401: 'Your session has expired. Start a new session to continue.', 403: 'This action is not authorized for your current session.', 404: 'This report is unavailable or the link has expired.', 410: 'This report is unavailable or the link has expired.', 429: 'Too many scans. Please wait before trying again.', 500: 'The analyzer connection is unavailable. Retry when your scanning server is running.', 503: 'The analyzer is unavailable. Please try again later.' };
     throw new ApiError(known[response.status] || (typeof payload?.error?.message === 'string' ? payload.error.message : 'The request could not be completed.'), response.status, Number.isFinite(delay) ? delay : 0);
   }
   const json = await response.json().catch(() => { throw new ApiError('The server returned an unexpected response.', 502); });
@@ -29,12 +29,12 @@ export const getSession = (signal?: AbortSignal) => request('/api/session', sess
 export function getHistory(filters: Filters, cursor: string | null, signal?: AbortSignal) {
   const query = serializeFilters(filters); query.set('limit', '20'); if (cursor) query.set('cursor', cursor);
   return request(`/api/scans?${query}`, historySchema, signal).then(page => {
-    if (page.items.some(scan => scan.isRecorded)) throw new ApiError('Recorded demo data was received in live mode. Check the analyzer configuration.', 502);
+    if (page.items.some(scan => scan.isRecorded)) throw new ApiError('The analyzer returned sample results instead of completed scans. Check the analyzer configuration.', 502);
     return page;
   });
 }
 export const getScanDetail = (id: string, signal?: AbortSignal) => request(`/api/scans/${encodeURIComponent(id)}`, detailSchema, signal).then(scan => {
-  if (scan.isRecorded) throw new ApiError('Recorded demo data was received in live mode. Check the analyzer configuration.', 502);
+  if (scan.isRecorded) throw new ApiError('The analyzer returned sample results instead of completed scans. Check the analyzer configuration.', 502);
   return scan;
 });
 export function createScan(url: string, key: string, session: Session) {

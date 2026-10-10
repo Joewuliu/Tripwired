@@ -11,6 +11,6 @@ export function ScanBubble({ scan, onOpen }: { scan: ScanSummary; onOpen: (id: s
     <span className="scan-bubble-url" dir="ltr">{display}</span>
     <span className="scan-bubble-summary">{scan.headline}{scan.state === 'partial' ? ' · Partial' : ''}</span>
     <time className="scan-bubble-time" dateTime={scan.submittedAt} title={formatDate(scan.submittedAt)}>{formatRelative(scan.submittedAt)}</time>
-    <ChevronRight className="row-chevron" size={17} aria-hidden="true" /><span className="sr-only">{inputLabels[scan.inputType]}{scan.isRecorded ? '. Recorded demo' : ''}</span>
+    <ChevronRight className="row-chevron" size={17} aria-hidden="true" /><span className="sr-only">{inputLabels[scan.inputType]}</span>
   </button>;
 }

@@ -1,6 +1,23 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+import { seedFixtures } from '../../src/demo/fixtures';
+import { filterRecords, readFilters } from '../../src/utils/filters';
+import { readFileSync } from 'node:fs';
 
-test.beforeEach(async ({ page }) => { await page.goto('/?mode=demo'); });
+async function setupApi(page: Page) {
+  const records = seedFixtures().map(scan => ({...scan, isRecorded: false, limitations: ['Visual comparison is not configured.'], screenshot: {...scan.screenshot, description: null, path: scan.screenshot.path ? `/api/scans/${scan.id}/screenshot` : null}}));
+  await page.route('**/api/session', route => route.fulfill({json: {scopeKey: 'browser-test', csrfToken: 'test-csrf', retentionDays: 7, inputTypes: ['url','message_screenshot','qr_image'], scanTimeoutSeconds: 45}}));
+  await page.route('**/api/scans?*', route => {
+    const params = new URL(route.request().url()).searchParams; const filtered = filterRecords(records, readFilters(params)); const offset = Number(params.get('cursor') || 0);
+    return route.fulfill({json: {items: filtered.slice(offset, offset+20), totalMatching: filtered.length, nextCursor: offset+20 < filtered.length ? String(offset+20) : null, serverTime: new Date().toISOString()}});
+  });
+  await page.route('**/api/scans/*', route => {
+    const scan = records.find(scan => route.request().url().endsWith(`/api/scans/${scan.id}`));
+    return route.fulfill(scan ? {json: scan} : {status:404});
+  });
+  await page.route('**/api/scans/*/screenshot', route => route.fulfill({contentType: 'image/png', body: readFileSync('public/demo/toll-capture.png')}));
+}
+
+test.beforeEach(async ({ page }) => { await setupApi(page); await page.goto('/'); });
 test('renders the specified homepage and paginated history', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'PhishFinder', exact: true })).toBeVisible();
   await expect(page.getByText('Created by Joseph, Peter, Srijith.')).toBeVisible();
@@ -35,7 +52,8 @@ test('report contains inert URLs, screenshot, checks, FTC handoff and focus rest
   await expect(dialog.locator('a[href*="toll"]')).toHaveCount(0);
   await expect(dialog.getByRole('img', { name: 'Captured landing page associated with this scan' })).toBeVisible();
   await dialog.getByRole('button', { name: 'Report to the FTC', exact: true }).click();
-  await expect(dialog.getByLabel('Prepared report summary')).toContainText('Recorded demo');
+  await expect(dialog.getByLabel('Prepared report summary')).toContainText('PhishFinder scan report');
+  await expect(dialog).not.toContainText(/demo/i);
   await expect(dialog.getByRole('link', { name: 'Continue to FTC' })).toHaveAttribute('href', 'https://reportfraud.ftc.gov/');
   await page.keyboard.press('Escape'); await expect(dialog).not.toBeVisible();
   await expect(first).toBeFocused();
@@ -45,19 +63,17 @@ test('Back and Forward navigate reports; a direct report survives refresh', asyn
   await page.goBack(); await expect(page.getByRole('dialog')).not.toBeVisible();
   await page.goForward(); await expect(page.getByRole('dialog')).toBeVisible();
   await page.reload(); await expect(page.getByRole('dialog')).toBeVisible();
-  await page.getByRole('button', { name: 'Close report' }).click(); await expect(page).toHaveURL(/\/?mode=demo/);
+  await page.getByRole('button', { name: 'Close report' }).click(); await expect(page).toHaveURL(/\/$/);
 });
-test('invalid submission retains input; demo playback completes without contacting the submitted site', async ({ page }) => {
-  const requests: string[] = []; page.on('request', req => requests.push(req.url()));
+test('invalid submission retains input and old preview URLs use the API without demo controls', async ({ page }) => {
+  await page.goto('/?mode=demo');
+  await expect(page).not.toHaveURL(/mode=/);
+  await expect(page.locator('.scan-bubble')).toHaveCount(20);
+  await expect(page.locator('.mode-bar, .subtitle, .connection-status, .reset-demo, .page-footer')).toHaveCount(0);
+  await expect(page.locator('body')).not.toContainText(/demo|fictional|Check suspicious links without opening/i);
   await page.getByLabel('Suspicious URL', { exact: true }).fill('javascript:alert(1)');
   await page.getByRole('button', { name: 'Scan link', exact: true }).click();
   await expect(page.locator('#url-error')).toBeVisible();
-  await page.getByLabel('Suspicious URL', { exact: true }).fill('https://suspicious-example.test/payment?token=secret');
-  await page.getByRole('button', { name: 'Scan link', exact: true }).click();
-  await expect(page.getByRole('dialog')).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Report summary', exact: true })).toBeVisible({ timeout: 15000 });
-  expect(requests.every(url => url.startsWith('http://127.0.0.1:5173/'))).toBe(true);
-  await expect(page.locator('.report-url')).not.toContainText('secret');
 });
 test('320px layout has no horizontal overflow and modal keyboard stays contained', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });

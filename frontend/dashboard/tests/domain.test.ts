@@ -47,9 +47,9 @@ describe('reports and transport', () => {
   it('rejects recorded reports and histories returned by the live adapter', async () => {
     const scan = seedFixtures()[0];
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify(scan), { status: 200 })));
-    await expect(getScanDetail(scan.id)).rejects.toThrow('Recorded demo data');
+    await expect(getScanDetail(scan.id)).rejects.toThrow('The analyzer returned sample results');
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({ items: [scan], nextCursor: null, totalMatching: 1, serverTime: new Date().toISOString() }), { status: 200 })));
-    await expect(getHistory(defaultFilters, null)).rejects.toThrow('Recorded demo data');
+    await expect(getHistory(defaultFilters, null)).rejects.toThrow('The analyzer returned sample results');
     vi.unstubAllGlobals();
   });
   it('accepts fixture combinations including partial, null score and failure', () => {

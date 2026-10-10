@@ -1,10 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { X, ShieldCheck, Clock3, AlertTriangle, LoaderCircle } from 'lucide-react';
-import type { Mode, ScanDetail } from '../types/scan';
+import type { ScanDetail } from '../types/scan';
 import { isActive } from '../types/scan';
 import { ApiError, getScanDetail, keepNewest, retryDelay, retryRequest } from '../api/scans';
-import { demoDetail } from '../demo/store';
 import { defangUrl } from '../utils/defang';
 import { formatDate } from '../utils/time';
 import { CheckTimeline } from './CheckTimeline';
@@ -12,11 +11,11 @@ import { ScreenshotPanel } from './ScreenshotPanel';
 import { ReportSummary } from './ReportSummary';
 import { FtcHandoff } from './FtcHandoff';
 
-export function ReportDialog({ id, mode, scope, ready, close, onRescan, rescanning, accessError, actionError, onUnauthorized }: { id: string; mode: Mode; scope: string; ready: boolean; close: () => void; onRescan: (scan: ScanDetail) => void; rescanning: boolean; accessError: string | null; actionError: string; onUnauthorized: () => void }) {
+export function ReportDialog({ id, scope, ready, close, onRescan, rescanning, accessError, actionError, onUnauthorized }: { id: string; scope: string; ready: boolean; close: () => void; onRescan: (scan: ScanDetail) => void; rescanning: boolean; accessError: string | null; actionError: string; onUnauthorized: () => void }) {
   const ref = useRef<HTMLDialogElement>(null); const initial = useRef<HTMLHeadingElement>(null);
   const focusedReport = useRef(false);
   const previouslyActive = useRef(false);
-  const report = useQuery({ queryKey: ['scan', mode, scope, id], queryFn: ({ signal }) => mode === 'demo' ? demoDetail(id) : getScanDetail(id, signal), enabled: ready && !accessError,
+  const report = useQuery({ queryKey: ['scan', 'live', scope, id], queryFn: ({ signal }) => getScanDetail(id, signal), enabled: ready && !accessError,
     retry: retryRequest, retryDelay, refetchInterval: query => {
       if (query.state.error || !query.state.data) return false;
       return isActive(query.state.data.state) ? 1500 : false;
@@ -62,7 +61,6 @@ export function ReportDialog({ id, mode, scope, ready, close, onRescan, rescanni
   return <dialog ref={ref} className="report-dialog" aria-labelledby="report-title" onCancel={e => { e.preventDefault(); close(); }} onClick={e => { if (e.target === ref.current) { const box = ref.current!.getBoundingClientRect(); if (e.clientX < box.left || e.clientX > box.right || e.clientY < box.top || e.clientY > box.bottom) close(); } }}>
     <div className="report-toolbar"><span className="toolbar-label"><ShieldCheck size={17} aria-hidden="true" />Scan report</span><span className="toolbar-time">{scan ? formatDate(scan.submittedAt) : 'Loading report'}</span><button className="icon-button" aria-label="Close report" onClick={close}><X size={20} /></button></div>
     <div className="report-dialog-body">
-      {mode === 'demo' && <p className="report-demo-banner">Recorded demo — no live scan{active ? ' · Illustrative playback' : ''}</p>}
       {!scan && <h2 ref={initial} id="report-title" className="loading-title" tabIndex={-1}>Scan report</h2>}
       {(accessError || report.error) && <div className="error-panel" role="status"><p>{accessError || report.error?.message}</p>{!accessError && <button className="button" onClick={() => report.refetch()}>Retry report</button>}<button className="button" onClick={close}>Back to scans</button></div>}
       {!scan && !report.error && !accessError && <div className="report-loading" role="status"><LoaderCircle size={30} className="spin" /><p>Loading this report…</p></div>}

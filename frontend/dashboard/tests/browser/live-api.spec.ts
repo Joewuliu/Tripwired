@@ -46,7 +46,9 @@ test('429 honors Retry-After and preserves the input', async ({ page }) => {
 });
 test('clipboard denial reveals a selectable summary without claiming FTC submission', async ({ page }) => {
   await page.addInitScript(() => Object.defineProperty(navigator, 'clipboard', { value: { writeText: () => Promise.reject(new Error('denied')) } }));
-  await page.goto('/r/demo-toll?mode=demo');
+  await setup(page);
+  await page.route('**/api/scans/live-example', route => route.fulfill({ json: liveFixture() }));
+  await page.goto('/r/live-example');
   await page.getByRole('button', { name: 'Copy report summary', exact: true }).click();
   await expect(page.getByLabel('Prepared report summary')).toBeVisible();
   await expect(page.getByLabel('Prepared report summary')).toBeFocused();
@@ -98,4 +100,14 @@ test('session expiration removes private history and disables submission', async
   await page.getByRole('button', { name: 'Close report' }).click();
   await expect(page.locator('.scan-bubble')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Scan link', exact: true })).toBeDisabled();
+});
+
+test('missing analyzer leaves history empty and submission disabled, including obsolete demo URLs', async ({ page }) => {
+  await page.route('**/api/session', route => route.fulfill({status:503}));
+  await page.goto('/?mode=demo');
+  await expect(page.getByRole('button', {name:'Retry connection', exact:true})).toBeVisible({timeout:15000});
+  await expect(page.locator('.scan-bubble')).toHaveCount(0);
+  await expect(page.getByRole('button', {name:'Scan link', exact:true})).toBeDisabled();
+  await expect(page.locator('body')).not.toContainText(/demo|fictional/i);
+  await expect(page).not.toHaveURL(/mode=/);
 });
