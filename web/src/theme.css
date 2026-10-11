@@ -21,6 +21,13 @@
   --sky-bottom: #d6efcb;
   --sky-glow: #ffffff;
 
+  /* Artwork. Swap a file or point a variable somewhere else to change it; nothing else names them.
+     The logo is the clownfish; public/icons/globe.png is the alternative. */
+  --wallpaper: url('/icons/wallpaper2.jpg');
+  --logo: url('/icons/clownfish.png');
+  --cursor: url('/cursors/hand.svg') 11 2, default;
+  --cursor-active: url('/cursors/hand-active.svg') 11 2, pointer;
+
   /* Text */
   --ink: #123447;
   --muted: #36576a;

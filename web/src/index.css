@@ -16,10 +16,62 @@ body {
   line-height: 1.5;
   color: var(--ink);
   background-color: var(--sky-mid);
+  /* The wallpaper sits behind the glass, uncropped by filters; the sky gradient shows while it loads */
   background-image:
-    radial-gradient(ellipse at 45% -10%, var(--sky-glow) 0, rgba(255, 255, 255, 0.47) 30%, transparent 68%),
+    var(--wallpaper),
     linear-gradient(180deg, var(--sky-top) 0%, var(--sky-mid) 55%, var(--sky-bottom) 100%);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
   background-attachment: fixed;
+}
+
+/* Pixel-art hand pointers on devices with a mouse; editable fields keep the text cursor */
+@media (hover: hover) and (pointer: fine) {
+  body {
+    cursor: var(--cursor);
+  }
+  button:not(:disabled),
+  a[href] {
+    cursor: var(--cursor-active);
+  }
+  input,
+  code {
+    cursor: text;
+  }
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 var(--gap);
+  padding: 8px 16px 8px 10px;
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--radius);
+  background: var(--glass-solid);
+  box-shadow: var(--glass-inset), var(--shadow);
+  text-decoration: none;
+  width: fit-content;
+}
+
+@supports (backdrop-filter: blur(12px)) or (-webkit-backdrop-filter: blur(12px)) {
+  .brand {
+    background: var(--glass-strong); /* the gradient wordmark needs a bright plate over the dark sky */
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+  }
+}
+
+.brand-logo {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  background: var(--logo) center / contain no-repeat;
+}
+
+.brand .wordmark {
+  font-size: clamp(28px, 8vw, 38px);
 }
 
 /* Two glass bubbles drifting at the edges: decoration, never between a person and the evidence */

@@ -9,6 +9,7 @@ services:
       SAFE_BROWSING_API_KEY: ${SAFE_BROWSING_API_KEY:-}
       URLHAUS_AUTH_KEY: ${URLHAUS_AUTH_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-} # blank: the analyzer's default model
       # The evaluation harness opens live phishing pages and refuses to run unless this is 1.
       TRIPWIRE_EVAL_OK: ${TRIPWIRE_EVAL_OK:-0}
       # Browsers running at once (1 to 6). They share the VM's CPU: fewer can finish sooner.

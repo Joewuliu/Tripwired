@@ -6,6 +6,7 @@ import type { Report } from '../contract.ts'
 import { remember } from '../history.ts'
 import sampleJson from '../sample/report.sample.json'
 import { VERDICT_LABEL, VERDICT_NOTE } from '../verdict.ts'
+import { Brand } from './Brand.tsx'
 import { CheckBox } from './CheckBox.tsx'
 import { NotFound } from './NotFound.tsx'
 
@@ -94,7 +95,7 @@ export function ReportPage({ id }: { id: string }) {
   if (load.kind === 'loading') {
     return (
       <main className="page">
-        <p className="eyebrow">Tripwire report</p>
+        <Brand />
         <p role="status" className="glass">
           Loading the report&hellip;
         </p>
@@ -107,14 +108,16 @@ export function ReportPage({ id }: { id: string }) {
   if (load.kind === 'error') {
     return (
       <main className="page">
-        <p className="eyebrow">Tripwire report</p>
-        <h1>We couldn&apos;t load this report.</h1>
-        <p className="notice error" role="alert">
-          {load.message}
-        </p>
-        <p>
-          <a href="">Try again</a> &middot; <a href="/">Back to the start</a>
-        </p>
+        <Brand />
+        <section className="glass">
+          <h1>We couldn&apos;t load this report.</h1>
+          <p className="notice error" role="alert">
+            {load.message}
+          </p>
+          <p>
+            <a href="">Try again</a> &middot; <a href="/">Back to the start</a>
+          </p>
+        </section>
       </main>
     )
   }
@@ -128,6 +131,7 @@ export function ReportPage({ id }: { id: string }) {
 
   return (
     <main className="page">
+      <Brand />
       <header className={`glass report-header verdict-${report.verdict}`}>
         <p className="eyebrow">Tripwire report</p>
         {id === 'sample' && (
@@ -151,6 +155,12 @@ export function ReportPage({ id }: { id: string }) {
         <p className="link-line">
           Link: <code>{report.url_defanged}</code>
         </p>
+        {report.explained_by === 'gemini' && (
+          <p className="fineprint">
+            The wording above was written by an AI model from the findings below. The verdict comes from the
+            points, not from the AI.
+          </p>
+        )}
       </header>
 
       <WhatToDo report={report} />

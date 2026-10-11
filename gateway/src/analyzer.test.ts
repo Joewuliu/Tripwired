@@ -68,3 +68,25 @@ test("fetchScreenshot refuses an address on another host", async () => {
     /not on the analyzer/,
   );
 });
+
+test("readImage posts the picture as base64 and returns what was found", async () => {
+  let seen: { mime_type?: string; data_base64?: string; url?: string } = {};
+  const base = await start((req, res) => {
+    let body = "";
+    req.on("data", (chunk) => (body += chunk));
+    req.on("end", () => {
+      seen = { ...JSON.parse(body), url: req.url };
+      res.setHeader("content-type", "application/json").end(JSON.stringify({ status: "ok", urls: ["https://a.example/x", 7] }));
+    });
+  });
+  const reading = await createAnalyzer(base).readImage(Buffer.from([1, 2, 3]), "image/jpeg");
+  assert.equal(seen.url, "/read-image");
+  assert.equal(seen.mime_type, "image/jpeg");
+  assert.equal(seen.data_base64, "AQID");
+  assert.deepEqual(reading, { status: "ok", urls: ["https://a.example/x"] });
+});
+
+test("readImage: an unexpected status is treated as unavailable", async () => {
+  const base = await start((_req, res) => void res.setHeader("content-type", "application/json").end(JSON.stringify({ status: "weird", urls: [] })));
+  assert.deepEqual(await createAnalyzer(base).readImage(Buffer.from([1]), "image/png"), { status: "unavailable", urls: [] });
+});

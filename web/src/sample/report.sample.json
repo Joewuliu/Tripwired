@@ -12,6 +12,7 @@
     "Page asks for card details (page scan)",
     "Not listed by Google Safe Browsing, URLhaus or OpenPhish"
   ],
+  "explained_by": "template",
   "evidence": [
     {
       "id": "impersonation",

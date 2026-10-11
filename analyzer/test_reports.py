@@ -87,4 +87,6 @@ def test_a_report_with_a_bad_id_is_not_written(tmp_path):
 def test_nothing_about_who_asked_is_kept(tmp_path):
     save_report(tmp_path, result())
     text = (tmp_path / "5a3c0de1f2b4.json").read_text(encoding="utf-8")
-    assert set(json.loads(text)) == set(SAMPLE)  # exactly the contract, no sender, no raw url, no page text
+    # exactly the contract's fields, no sender, no raw url, no page text
+    assert set(json.loads(text)) == set(AnalysisResult.model_fields)
+    assert set(SAMPLE) <= set(AnalysisResult.model_fields)

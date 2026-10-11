@@ -422,6 +422,17 @@ If the reply has no `Full report` line, the gateway has no `PUBLIC_URL`: `docker
 recreates it from `SITE_HOST`. Reports are small JSON files in `data/reports/`; they hold the same
 defanged result the reply was built from, and nothing about who asked.
 
+## Gemini (wording and pictures)
+
+With `GEMINI_API_KEY` in the VM's `.env` (and `docker compose up -d`), two things change, and only
+these two: the headline and the three plain lines of a verdict are written by Gemini from the
+evidence list, and a screenshot or QR photo sent to the phone is read for its link. The verdict and
+the points never come from Gemini. Without the key, or if Gemini errors or takes more than a few
+seconds, the template wording goes out as before and a picture gets "I can't read pictures right
+now". `GEMINI_MODEL` overrides the default model name if it is retired. To try it by hand (no page is
+opened): `docker compose exec analyzer python gemini_check.py`. A report whose wording came from
+Gemini says so on its page.
+
 ## Updating
 
 After you commit and push from the laptop (Option A), or repeat the Option B copy:

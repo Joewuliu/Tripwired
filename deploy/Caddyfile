@@ -41,6 +41,9 @@
 	handle /analyze {
 		respond "Not found" 404
 	}
+	handle /read-image {
+		respond "Not found" 404
+	}
 
 	# The built web app. Unknown paths such as /r/<id> get index.html and the page routes itself.
 	handle {

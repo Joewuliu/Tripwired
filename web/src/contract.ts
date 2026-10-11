@@ -39,6 +39,7 @@ export interface Report {
   score: number
   headline: string
   observations: string[]
+  explained_by: 'template' | 'gemini' // who wrote the headline and lines; the verdict is never Gemini's
   evidence: Evidence[]
   points_table: PointsRule[]
   brand_match: BrandMatch | null
@@ -134,6 +135,8 @@ export function parseReport(value: unknown): Report {
     score: int(o.score, 'score'),
     headline: str(o.headline, 'headline'),
     observations: list(o.observations, 'observations', str),
+    // Reports stored before the field existed are template-written.
+    explained_by: o.explained_by === 'gemini' ? 'gemini' : 'template',
     evidence: list(o.evidence, 'evidence', readEvidence),
     points_table: list(o.points_table, 'points_table', readRule),
     brand_match: nullable(o.brand_match, 'brand_match', readBrandMatch),

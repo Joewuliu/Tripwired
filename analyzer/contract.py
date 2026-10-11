@@ -56,7 +56,8 @@ class AnalysisResult(_Model):
     verdict: Verdict
     score: int  # the points the evidence adds up to, never below 0
     headline: str
-    observations: list[str]  # the evidence sentences, most important first; consumers show up to three
+    observations: list[str]  # plain lines saying why, most important first; consumers show up to three
+    explained_by: Literal["template", "gemini"] = "template"  # who wrote headline and observations; never the verdict
     evidence: list[Evidence]  # every finding with its points and source, in the same order
     points_table: list[PointsRule]  # the whole table in use, so a report can show how the verdict is reached
     brand_match: BrandMatch | None

@@ -51,3 +51,16 @@ test("several text parts are joined", () => {
 test("blank text is ignored", () => {
   assert.deepEqual(toInbound({ type: "text", text: "   " }), { kind: "ignore" });
 });
+
+test("a picture that can be read is carried along, unread until needed", async () => {
+  let reads = 0;
+  const attachment = { type: "attachment", mimeType: "image/heic", size: 4, read: async () => (reads++, Buffer.from([1, 2, 3, 4])) };
+  const inbound = toInbound({ type: "group", items: [{ content: { type: "text", text: "scan this" } }, { content: attachment }] });
+  assert.equal(inbound.kind, "text");
+  if (inbound.kind !== "text") return;
+  assert.equal(inbound.pictures?.length, 1);
+  assert.equal(reads, 0);
+  assert.equal(inbound.pictures![0].mimeType, "image/heic");
+  assert.equal(inbound.pictures![0].size, 4);
+  assert.deepEqual([...(await inbound.pictures![0].read())], [1, 2, 3, 4]);
+});

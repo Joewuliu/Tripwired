@@ -2,10 +2,18 @@ import type { AnalysisResult } from "./reply";
 
 const ANALYZE_TIMEOUT_MS = 45_000;
 const SCREENSHOT_TIMEOUT_MS = 10_000;
+const READ_IMAGE_TIMEOUT_MS = 25_000; // Gemini gets 15 s inside the analyzer
 const DEFAULT_BASE = "http://127.0.0.1:8001";
+
+/** What reading a picture came to: addresses as the picture shows them, or "unavailable". */
+export interface PictureReading {
+  status: "ok" | "unavailable";
+  urls: string[];
+}
 
 export interface Analyzer {
   analyze(url: string): Promise<AnalysisResult>;
+  readImage(bytes: Buffer, mimeType: string): Promise<PictureReading>;
   fetchScreenshot(path: string): Promise<Buffer>;
 }
 
@@ -71,6 +79,23 @@ export function createAnalyzer(base = process.env.ANALYZER_URL || DEFAULT_BASE):
         });
         if (!response.ok) throw new Error(`analyzer returned ${response.status}`);
         return parse(await response.json());
+      } catch (error) {
+        throw classify(error, base);
+      }
+    },
+
+    async readImage(bytes, mimeType) {
+      try {
+        const response = await fetch(new URL("/read-image", base), {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ mime_type: mimeType, data_base64: bytes.toString("base64") }),
+          signal: AbortSignal.timeout(READ_IMAGE_TIMEOUT_MS),
+        });
+        if (!response.ok) throw new Error(`analyzer returned ${response.status}`);
+        const body = (await response.json()) as { status?: unknown; urls?: unknown };
+        const urls = Array.isArray(body.urls) ? body.urls.filter((u): u is string => typeof u === "string") : [];
+        return { status: body.status === "ok" ? "ok" : "unavailable", urls };
       } catch (error) {
         throw classify(error, base);
       }

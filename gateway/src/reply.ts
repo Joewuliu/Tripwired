@@ -2,10 +2,18 @@ import * as linkify from "linkifyjs";
 
 export const OPENING = "Opening that in a sandbox. About 20 seconds.";
 export const NO_URL = "Forward me a suspicious text or link and I'll open it in a sandbox for you.";
-export const IMAGE_SOON = "Screenshot checking is coming soon. For now, paste the link itself.";
+export const PICTURE_UNAVAILABLE = "I can't read pictures right now. Paste the link itself and I'll check it.";
+export const READING_PICTURE = "Looking for a link in your picture. A few seconds.";
+export const NO_LINK_IN_PICTURE =
+  "I couldn't find a link in that picture. If it's a QR code, try a closer, steadier photo, or paste the link itself.";
 export const ONE_AT_A_TIME = "I check one link at a time, so I opened the first one.";
 export const ANALYZER_DOWN =
   "I couldn't check that right now. Don't tap the link until you can verify it another way.";
+
+/** Said before the scan of a link that was read from a picture, so a misread is visible. */
+export function foundInPicture(url: string): string {
+  return `I found this link in your picture: ${defangText(url)}\nOpening it in a sandbox. About 20 seconds.`;
+}
 
 const COULDNT_CHECK_HEADLINE =
   "Couldn't get a proper look at this link. Don't enter anything until you verify it another way.";

@@ -3,7 +3,7 @@ import re
 import secrets
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
@@ -13,10 +13,12 @@ from brands import BRANDS
 from contract import AnalysisResult, BrandMatch, Hop
 from defang import defang, defang_text
 from env import load_root_env
+from explain import explain
 from pipeline import scan
 from public_check import RateLimiter, normalize
 from reports import load_report, save_report
 from score import judge
+from vision import MAX_BYTES, decode, read_links
 
 load_root_env()  # API keys for the threat feeds live in the repo-root .env
 
@@ -49,19 +51,39 @@ def _brand_match(brand_findings: list[dict]) -> BrandMatch | None:
     )
 
 
+async def _wording(judgement) -> tuple[str, list[str], str]:
+    """The headline and lines to show. Gemini may reword them; it cannot touch the verdict, the score
+    or the evidence, and anything it gets wrong leaves the template wording as it was."""
+    explained = await explain(judgement.verdict, judgement.evidence)
+    if explained is None:
+        return judgement.headline, judgement.observations, "template"
+    if judgement.verdict in ("dangerous", "suspicious"):
+        label = "Dangerous" if judgement.verdict == "dangerous" else "Suspicious"
+        return f"{label}: {explained.headline}", explained.lines, "gemini"
+    # The fixed headline of the clean and couldn't-check verdicts stays ours. A couldn't-check always
+    # leads with its reason, as the scorer ordered it.
+    lines = explained.lines
+    if judgement.verdict == "couldnt_check" and judgement.evidence:
+        reason = judgement.evidence[0].label
+        lines = [reason, *[line for line in lines if line != reason][:2]]
+    return judgement.headline, lines, "gemini"
+
+
 async def _scan_and_store(url: str) -> AnalysisResult:
     scan_id = secrets.token_hex(6)
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     result = await scan(url, DATA_DIR / f"{scan_id}.png")
     opened = result.opened
     judgement = judge(result)
+    headline, observations, explained_by = await _wording(judgement)
     analysis = AnalysisResult(
         id=scan_id,
         created_at=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         verdict=judgement.verdict,
         score=judgement.score,
-        headline=judgement.headline,
-        observations=judgement.observations,
+        headline=headline,
+        observations=observations,
+        explained_by=explained_by,
         evidence=judgement.evidence,
         points_table=judgement.points_table,
         brand_match=_brand_match(result.brand),
@@ -115,6 +137,27 @@ async def check(body: CheckRequest, request: Request) -> CheckResponse:
         raise HTTPException(status_code=429, headers={"Retry-After": str(int(wait) + 1)})
     result = await _scan_and_store(url)
     return CheckResponse(id=result.id)
+
+
+class ReadImageRequest(BaseModel):
+    mime_type: str = Field(max_length=64)
+    data_base64: str = Field(max_length=(MAX_BYTES * 4) // 3 + 16)
+
+
+class ReadImageResponse(BaseModel):
+    status: Literal["ok", "unavailable"]  # "unavailable": no key, an error, or too slow
+    urls: list[str]  # addresses found, as the picture shows them; the gateway then asks /analyze
+
+
+@app.post("/read-image", response_model=ReadImageResponse)
+async def read_image(request: ReadImageRequest) -> ReadImageResponse:
+    """Internal: the gateway reaches it over the private network and Caddy answers 404. Finds the link
+    in a screenshot or a QR photo. It decides nothing: the link is scanned like any other."""
+    data = decode(request.data_base64)
+    if data is None:
+        raise HTTPException(status_code=422, detail="not base64")
+    reading = await read_links(data, request.mime_type)
+    return ReadImageResponse(status=reading.status, urls=reading.urls)
 
 
 @app.get("/api/report/{report_id}", response_model=AnalysisResult)
