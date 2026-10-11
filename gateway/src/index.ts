@@ -3,9 +3,11 @@ import { imessage } from "spectrum-ts/providers/imessage";
 import { terminal } from "spectrum-ts/providers/terminal";
 import { createSeenSet } from "./dedupe";
 import { loadRootEnv } from "./env";
-import { type Outbox, handleInbound } from "./handler";
+import { type Outbox, type Policy, handleInbound } from "./handler";
 import { toInbound } from "./inbound";
+import { RateLimiter, limitFromEnv } from "./limiter";
 import { chooseProviders } from "./providers";
+import { createHasher, label, redact } from "./sender";
 
 function outboxFor(space: Space): Outbox {
   return {
@@ -43,16 +45,21 @@ async function main(): Promise<void> {
   }
 
   const alreadySeen = createSeenSet();
+  const hasher = createHasher(process.env.SENDER_SALT);
+  const limiter = new RateLimiter(limitFromEnv(process.env.TRIPWIRE_CHECKS_PER_HOUR));
   for await (const [space, message] of app.messages) {
     if (message.direction === "outbound" || alreadySeen(message.id)) continue;
+    // The number is hashed here and goes no further: only the hash and its last four digits are kept.
+    const sender = hasher.identify(message.sender?.id ?? space.id ?? "");
+    const policy: Policy = { label: label(sender), limit: limiter.limit, take: () => limiter.take(sender.hash) };
     // Not awaited: one slow scan must not hold up the next message.
-    handleInbound(toInbound(message.content), outboxFor(space)).catch((error) =>
-      console.error("message failed:", error),
+    handleInbound(toInbound(message.content), outboxFor(space), undefined, undefined, policy).catch((error) =>
+      console.error("message failed:", redact(error instanceof Error ? error.message : String(error))),
     );
   }
 }
 
 main().catch((error) => {
-  console.error(error);
+  console.error(redact(error instanceof Error ? error.message : String(error)));
   process.exit(1);
 });

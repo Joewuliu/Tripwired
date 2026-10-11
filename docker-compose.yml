@@ -43,6 +43,10 @@ services:
       PUBLIC_URL: https://${SITE_HOST:?set SITE_HOST in .env (see deploy/DEPLOY.md)}
       SPECTRUM_PROJECT_ID: ${SPECTRUM_PROJECT_ID:-}
       SPECTRUM_PROJECT_SECRET: ${SPECTRUM_PROJECT_SECRET:-}
+      # Salt for hashing sender numbers (gateway only; the analyzer never sees who asked) and the
+      # checks an hour each sender gets.
+      SENDER_SALT: ${SENDER_SALT:-}
+      TRIPWIRE_CHECKS_PER_HOUR: ${TRIPWIRE_CHECKS_PER_HOUR:-10}
     depends_on:
       analyzer:
         condition: service_healthy

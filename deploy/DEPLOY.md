@@ -433,6 +433,31 @@ now". `GEMINI_MODEL` overrides the default model name if it is retired. To try i
 opened): `docker compose exec analyzer python gemini_check.py`. A report whose wording came from
 Gemini says so on its page.
 
+## Sender privacy and the rate limit
+
+Each sender gets 10 checks an hour (`TRIPWIRE_CHECKS_PER_HOUR`); the next one gets a friendly reply
+with the wait in minutes and nothing is scanned. Messages that start no check (no link, a reaction)
+are not counted. Counting is in the gateway's memory, so a restart clears it.
+
+The gateway turns the sender's number into a salted HMAC (`SENDER_SALT` in `.env`) the moment a
+message arrives, and keeps only that hash and the last four digits. Log lines say
+`checking hxxps://example[.]com for 3f9a1c2e •••-4412`: a hash prefix and the mask. Reports, the
+analyzer and the web pages never receive who asked. Make a salt once and keep it:
+
+```powershell
+-join ((1..32) | % { '{0:x2}' -f (Get-Random -Max 256) })
+```
+
+Add `SENDER_SALT=<that>` to the VM's `.env`, then `docker compose up -d`. Without it the gateway logs
+a warning and uses a random salt per run (limits work; hashes change on restart).
+
+**Check the logs for numbers** (after sending a few messages from your phone):
+
+```bash
+docker compose logs gateway --since 1h | grep -E '\+?[0-9][0-9 ()-]{8,}[0-9]'   # prints nothing
+docker compose logs gateway --since 1h | grep -E 'checking|rate limited'          # hash + •••-last4
+```
+
 ## Updating
 
 After you commit and push from the laptop (Option A), or repeat the Option B copy:

@@ -10,6 +10,16 @@ export const ONE_AT_A_TIME = "I check one link at a time, so I opened the first 
 export const ANALYZER_DOWN =
   "I couldn't check that right now. Don't tap the link until you can verify it another way.";
 
+/** The friendly "slow down" reply: how many checks, and roughly when the next one is free. */
+export function rateLimited(limit: number, waitMs: number): string {
+  const minutes = Math.max(1, Math.ceil(waitMs / 60_000));
+  return (
+    `You've used your ${limit} checks for this hour. I can check another link in about ` +
+    `${minutes} minute${minutes === 1 ? "" : "s"}. The limit keeps Tripwire available for everyone. ` +
+    "Until then, don't tap the link or enter anything on it."
+  );
+}
+
 /** Said before the scan of a link that was read from a picture, so a misread is visible. */
 export function foundInPicture(url: string): string {
   return `I found this link in your picture: ${defangText(url)}\nOpening it in a sandbox. About 20 seconds.`;

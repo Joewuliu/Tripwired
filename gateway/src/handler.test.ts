@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { type Analyzer, AnalyzerUnreachable } from "./analyzer";
+import { RateLimiter } from "./limiter";
+import { createHasher, label } from "./sender";
 import { type Outbox, handleInbound } from "./handler";
 import {
   ANALYZER_DOWN,
@@ -12,6 +14,7 @@ import {
   READING_PICTURE,
   type AnalysisResult,
   foundInPicture,
+  rateLimited,
 } from "./reply";
 
 const RESULT: AnalysisResult = {
@@ -219,4 +222,85 @@ test("with several links, the first is checked and the user is told", async () =
   await handleInbound({ kind: "text", text: "https://a.example/x and https://b.example/y" }, out, analyzer);
   assert.deepEqual(analyzer.asked, ["https://a.example/x"]);
   assert.equal(sent.at(-1), `text:${ONE_AT_A_TIME}`);
+});
+
+// --- Rate limit and sender privacy --------------------------------------------------------------
+
+const NUMBER = "+1 (919) 555-4412";
+
+function policyFor(raw: string, limiter: RateLimiter) {
+  const sender = createHasher("a-long-enough-test-salt-0123456789", () => {}).identify(raw);
+  return { label: label(sender), limit: limiter.limit, take: () => limiter.take(sender.hash) };
+}
+
+test("the eleventh check in an hour gets the friendly reply and no scan", async () => {
+  const limiter = new RateLimiter(10);
+  const analyzer = fakeAnalyzer();
+  const policy = policyFor(NUMBER, limiter);
+  for (let i = 0; i < 10; i++) await handleInbound({ kind: "text", text: "https://example.com" }, recorder().out, analyzer, undefined, policy);
+  assert.equal(analyzer.asked.length, 10);
+
+  const { out, sent } = recorder();
+  await handleInbound({ kind: "text", text: "https://example.com" }, out, analyzer, undefined, policy);
+  assert.equal(analyzer.asked.length, 10); // nothing more was scanned
+  assert.equal(sent.length, 1);
+  assert.match(sent[0], /^text:You.ve used your 10 checks for this hour./);
+  assert.match(sent[0], /about \d+ minutes?/);
+  assert.ok(!/safe/i.test(sent[0].replace("Tripwire", "")));
+});
+
+test("pictures count too, and so does the second sender separately", async () => {
+  const limiter = new RateLimiter(1);
+  const analyzer = fakeAnalyzer({ readImage: async () => ({ status: "ok", urls: [] }) });
+  const mine = policyFor(NUMBER, limiter);
+  const other = policyFor("+1 919 555 0000", limiter);
+  const pic = { mimeType: "image/png", read: async () => Buffer.from([1]) };
+  await handleInbound({ kind: "image", pictures: [pic] }, recorder().out, analyzer, undefined, mine);
+  const { out, sent } = recorder();
+  await handleInbound({ kind: "image", pictures: [pic] }, out, analyzer, undefined, mine);
+  assert.match(sent[0], /used your 1 checks/);
+  const second = recorder();
+  await handleInbound({ kind: "image", pictures: [pic] }, second.out, analyzer, undefined, other);
+  assert.equal(second.sent[0], `text:${READING_PICTURE}`);
+});
+
+test("messages that start no check (how-to, ignored) are not counted", async () => {
+  const limiter = new RateLimiter(1);
+  const policy = policyFor(NUMBER, limiter);
+  const analyzer = fakeAnalyzer();
+  await handleInbound({ kind: "text", text: "hello" }, recorder().out, analyzer, undefined, policy);
+  await handleInbound({ kind: "ignore" }, recorder().out, analyzer, undefined, policy);
+  const { sent } = recorder();
+  await handleInbound({ kind: "text", text: "https://example.com" }, recorder().out, analyzer, undefined, policy);
+  assert.equal(analyzer.asked.length, 1);
+  assert.equal(sent.length, 0);
+});
+
+test("the wait is stated in whole minutes, at least one", () => {
+  assert.match(rateLimited(10, 90_000), /about 2 minutes/);
+  assert.match(rateLimited(10, 5_000), /about 1 minute\./);
+});
+
+test("no raw number reaches a log line, even when the analyzer fails with it in the message", async () => {
+  const lines: string[] = [];
+  const originals = { log: console.log, error: console.error, warn: console.warn };
+  console.log = (...a: unknown[]) => void lines.push(a.map(String).join(" "));
+  console.error = (...a: unknown[]) => void lines.push(a.map(String).join(" "));
+  try {
+    const limiter = new RateLimiter(1);
+    const policy = policyFor(NUMBER, limiter);
+    const analyzer = fakeAnalyzer({
+      fetchScreenshot: async () => {
+        throw new Error("could not deliver to +1 (919) 555-4412 / me@example.com");
+      },
+    });
+    await handleInbound({ kind: "text", text: "https://example.com" }, recorder().out, analyzer, undefined, policy);
+    await handleInbound({ kind: "text", text: "https://example.com" }, recorder().out, analyzer, undefined, policy); // limited
+  } finally {
+    Object.assign(console, originals);
+  }
+  const joined = lines.join("\n");
+  assert.match(joined, /rate limited [0-9a-f]{8} •••-4412/);
+  assert.match(joined, /checking hxxps:\/\/example\[\.\]com for [0-9a-f]{8} •••-4412/);
+  assert.ok(!/919|555-4412|5554412|me@example/.test(joined), joined);
 });
