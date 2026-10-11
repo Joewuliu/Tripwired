@@ -28,7 +28,7 @@ Run on the deployed system, through the same call a phone text uses ([`docs/accu
 - **5 of 5** well-known real sites came back "No red flags found"
 - **9.8 seconds** median time per check
 
-Because scams from threat feeds are listed by definition, the table also shows a "Without blocklists" column: the same scans with feed points removed. Six of the ten scams were already offline when we opened them, so only the blocklists caught those. Of the four that loaded, the sandbox and domain checks alone flagged 2 and missed 2 login pages (2 of 10 overall).
+Because scams from threat feeds are listed by definition, the table also shows a "Without blocklists" column: the same scans with feed points removed. Six of the ten scams were already offline when we opened them, so only the blocklists caught those. Of the four that loaded, the sandbox and domain checks alone flagged 2. The other 2 were the same fake login page reached by two different links, which only the blocklists caught.
 
 ## Challenges we ran into
 
