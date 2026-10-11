@@ -15,7 +15,7 @@ export function Home() {
           found in about 20 seconds.
         </p>
         <p>
-          <a href="/r/sample">See an example report</a>
+          <a href="/r/sample">See an example report</a> &middot; <a href="/dashboard">Watch scans live</a>
         </p>
       </section>
 

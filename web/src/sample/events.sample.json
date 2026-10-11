@@ -53,7 +53,7 @@
         "kind": "screenshot_ready",
         "sender": "•••-4412",
         "data": {
-          "screenshot_url": "/shots/5a3c0de1f2b4.png"
+          "screenshot_url": "/sample/shot.png"
         }
       }
     },
@@ -156,7 +156,7 @@
         "kind": "screenshot_ready",
         "sender": null,
         "data": {
-          "screenshot_url": "/shots/c81d7e30a9f2.png"
+          "screenshot_url": "/sample/shot-clean.png"
         }
       }
     },
@@ -380,8 +380,8 @@
         "sender": "•••-0731",
         "data": {
           "check": "sensitive_form",
-          "outcome": "clear",
-          "detail": "No sensitive form fields seen"
+          "outcome": "unavailable",
+          "detail": "Not checked: the page could not be read"
         }
       }
     },
@@ -395,8 +395,8 @@
         "sender": "•••-0731",
         "data": {
           "check": "platform_warning",
-          "outcome": "clear",
-          "detail": "The host shows no phishing warning for this page"
+          "outcome": "unavailable",
+          "detail": "Not checked: the page could not be read"
         }
       }
     },

@@ -268,3 +268,12 @@ def test_every_kind_the_bus_can_emit_is_documented_in_the_replay_file():
     sample = json.loads((pathlib.Path(__file__).resolve().parent.parent / "web" / "src" / "sample" / "events.sample.json").read_text(encoding="utf-8"))
     kinds = {item["event"]["kind"] for item in sample["events"]}
     assert kinds == set(events.KINDS)
+
+
+def test_an_unread_page_is_not_reported_free_of_forms_or_warnings(client, fresh_bus, monkeypatch):  # noqa: F811
+    fake_world(monkeypatch, loaded=False, complete=False, final_url=None, final_status=None, has_screenshot=False,
+               redirects=[], error="net::ERR_NAME_NOT_RESOLVED at https://gone.example/", age=OLD)
+    client.post("/analyze", json={"urls": ["https://gone.example/"]})
+    outcome = {e.data["check"]: e.data["outcome"] for e in fresh_bus.recent() if e.kind == "check_done"}
+    assert outcome["page_opened"] == outcome["sensitive_form"] == outcome["platform_warning"] == "unavailable"
+    assert "screenshot_ready" not in [e.kind for e in fresh_bus.recent()]

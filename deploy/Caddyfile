@@ -35,8 +35,8 @@
 
 	# The live event stream (Server-Sent Events), read-only: GET only, one event per step of every
 	# scan, addresses defanged and senders masked (•••-4412). flush_interval -1 sends each event as
-	# it happens; Content-Encoding is set so the gzip above leaves the stream alone. Open to any
-	# page on purpose: it is public data, and a dashboard being designed on a laptop can read it.
+	# it happens; Content-Encoding is set so the gzip above leaves the stream alone. The dashboard
+	# is served from this same host, so no other origin is allowed to read it from a page.
 	@events {
 		path /events
 		method GET
@@ -45,7 +45,6 @@
 		reverse_proxy analyzer:8001 {
 			flush_interval -1
 			header_down Content-Encoding identity
-			header_down Access-Control-Allow-Origin *
 		}
 	}
 	handle /events {

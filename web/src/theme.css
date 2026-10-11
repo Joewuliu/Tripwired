@@ -89,6 +89,21 @@
   --bubble-fill: radial-gradient(ellipse at 27% 18%, #ffffff 0%, rgba(255, 255, 255, 0.66) 8%, rgba(255, 255, 255, 0.1) 35%, rgba(135, 202, 219, 0.13) 57%, rgba(75, 175, 198, 0.32) 84%, rgba(224, 251, 255, 0.73) 100%);
   --bubble-edge: rgba(92, 166, 188, 0.53);
 
+  /* The live dashboard: bubble size, the tint a bubble takes for each verdict (under its glass
+     shine), the storm over a dangerous one, and the sparkle a finished check gives off */
+  --bubble-size: 136px;
+  --bubble-tint-scanning: rgba(255, 255, 255, 0.14);
+  --bubble-tint-dangerous: rgba(196, 34, 62, 0.66);
+  --bubble-tint-suspicious: rgba(240, 168, 36, 0.62);
+  --bubble-tint-clear: rgba(52, 190, 216, 0.52);
+  --bubble-tint-unknown: rgba(226, 232, 239, 0.86);
+  --storm-light: #7b8798;
+  --storm-dark: #333c4b;
+  --storm-flash: #fff3a8;
+  --sparkle: #ffffff;
+  --sparkle-glow: #7fe3eb;
+  --live: #17654a;
+
   /* Type */
   --font: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
   --font-display: 'Fredoka', 'Arial Rounded MT Bold', sans-serif;

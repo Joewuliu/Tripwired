@@ -483,6 +483,19 @@ Quick checks: `curl.exe -s -o NUL -w "%{http_code}" -X POST https://<host>/event
 `.../internal/reply-sent`, `.../analyze` and `.../read-image` are `404`. If events arrive in
 bursts instead of one by one, Caddy is buffering: check `flush_interval -1` on the `/events` block.
 
+## The live dashboard
+
+`https://<your-host>.sslip.io/dashboard` is the full-screen view for a laptop or a projector: each
+scan is a glass bubble that leaves the grass, climbs as its checks finish, and takes the colour of
+its verdict (red under storm clouds for Dangerous, amber for Suspicious, aqua for No red flags
+found, frosted grey for Couldn't check). Beside it are the sandbox screenshot, one line per check,
+the verdict, and "Reply sent to •••-4412"; the running totals are along the top. It reads `/events`
+on the same host and reconnects by itself. Click a bubble to keep the panel on that scan.
+
+`/dashboard?replay=1` plays a bundled recording on a loop instead (no scan, no network), for
+rehearsing or if the venue's network fails; add `&speed=2` to play it faster. A viewer who has
+asked their system for reduced motion gets the same information with nothing moving or flashing.
+
 ## Updating
 
 After you commit and push from the laptop (Option A), or repeat the Option B copy:
@@ -490,9 +503,17 @@ After you commit and push from the laptop (Option A), or repeat the Option B cop
 ```bash
 cd ~/tripwire
 git pull
-docker compose up -d --build
-docker image prune -f
+bash deploy/update.sh
 ```
+
+`deploy/update.sh` builds the images, starts the services, and then checks that each running
+container really is on the image just built; one that is not (Compose has left the old `caddy`
+container running after a rebuild, showing a bare `sha256:` under IMAGE) is recreated on its
+own. It ends by printing each service and the image it runs. By hand, the same thing is
+`docker compose up -d --build` followed by `docker compose up -d --force-recreate --no-deps caddy`.
+
+The Caddyfile and the web pages are inside the `caddy` image, so a change to either reaches the
+site only through a rebuild, which the script does every time.
 
 If `deploy/egress-firewall.sh` or the network section of `docker-compose.yml` changed, also run
 `sudo bash deploy/egress-firewall.sh`. If only `.env` changed, `docker compose up -d` is enough.

@@ -12,6 +12,7 @@ export default defineConfig({
     proxy: {
       '/api': analyzer,
       '/shots': analyzer,
+      '/events': analyzer,
     },
   },
 })

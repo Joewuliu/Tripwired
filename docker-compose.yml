@@ -5,6 +5,7 @@
 services:
   analyzer:
     build: ./analyzer
+    image: tripwire-analyzer # named so deploy/update.sh can check the container runs the newest build
     environment:
       SAFE_BROWSING_API_KEY: ${SAFE_BROWSING_API_KEY:-}
       URLHAUS_AUTH_KEY: ${URLHAUS_AUTH_KEY:-}
@@ -37,6 +38,7 @@ services:
 
   gateway:
     build: ./gateway
+    image: tripwire-gateway
     environment:
       ANALYZER_URL: http://analyzer:8001
       # The address behind the "Full report" line in a reply: this VM's own https name.
@@ -60,13 +62,15 @@ services:
     build:
       context: . # the repository root: the image compiles web/ and serves it
       dockerfile: deploy/caddy.Dockerfile
+    image: tripwire-caddy
     environment:
       SITE_HOST: ${SITE_HOST:?set SITE_HOST in .env (see deploy/DEPLOY.md)}
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # The Caddyfile is inside the image (deploy/caddy.Dockerfile), not mounted: a mounted single
+      # file keeps pointing at the old copy after "git pull" replaces it.
       - caddy_data:/data # the issued certificate lives here
       - caddy_config:/config
     depends_on:

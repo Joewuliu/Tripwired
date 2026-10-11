@@ -106,8 +106,10 @@ async def scan(url: str, shot_path: Path, emit: Emit | None = None) -> Scan:
     fields = opened.get("sensitive_fields", [])
     warning = find_platform_warning(opened["title"], opened["text"])
     _checked(emit, "brand_match", brand_view(brand))
-    _checked(emit, "sensitive_form", fields_view(fields))
-    _checked(emit, "platform_warning", warning_view(warning))
+    # A page that could not be read has not been found free of forms or warnings: say it was not checked.
+    unread = ("unavailable", "Not checked: the page could not be read")
+    _checked(emit, "sensitive_form", unread if access else fields_view(fields))
+    _checked(emit, "platform_warning", unread if access else warning_view(warning))
     return Scan(
         url=url, final_url=final_url, opened=opened, feeds=merge_results(first_feeds, chain_feeds), age=age,
         brand=brand, popular=is_popular(final_host, registered_domain(final_host)),
