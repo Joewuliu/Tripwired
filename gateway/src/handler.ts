@@ -12,7 +12,7 @@ import {
   formatReply,
   rateLimited,
 } from "./reply";
-import { redact } from "./sender";
+import { type SenderId, redact } from "./sender";
 import { extractUrls } from "./urls";
 
 /** A picture that came with a message. Its bytes are read only when we need them. */
@@ -34,6 +34,7 @@ export type Inbound =
  * masked number, never the number.
  */
 export interface Policy {
+  sender: SenderId;
   label: string;
   limit: number;
   take(): number | null;
@@ -93,18 +94,20 @@ async function scanAndReply(
   publicUrl: string | undefined,
   opening: string,
   who: string,
+  sender?: SenderId,
 ): Promise<void> {
   console.log(`checking ${defangText(urls[0])} for ${who}`);
   await out.sendText(opening);
   let result;
   try {
-    result = await analyzer.analyze(urls[0]);
+    result = await analyzer.analyze(urls[0], sender);
   } catch (error) {
     logFailure("analyzer failed", error);
     return out.sendText(ANALYZER_DOWN);
   }
   if (result.screenshot_url) await sendScreenshot(result.screenshot_url, out, analyzer);
   await out.sendText(formatReply(result, publicUrl));
+  await analyzer.replySent(result.id, sender);
   if (urls.length > 1) await out.sendText(ONE_AT_A_TIME);
 }
 
@@ -114,6 +117,7 @@ async function handlePictures(
   analyzer: Analyzer,
   publicUrl: string | undefined,
   who: string,
+  sender?: SenderId,
 ): Promise<void> {
   if (pictures.length === 0) return out.sendText(PICTURE_UNAVAILABLE);
   await out.sendText(READING_PICTURE);
@@ -127,7 +131,7 @@ async function handlePictures(
   if (found.status === "unavailable") return out.sendText(PICTURE_UNAVAILABLE);
   if (found.status === "none") return out.sendText(NO_LINK_IN_PICTURE);
   // The link is scanned like any typed link: the picture can only get it looked at.
-  return scanAndReply(found.urls, out, analyzer, publicUrl, foundInPicture(found.urls[0]), who);
+  return scanAndReply(found.urls, out, analyzer, publicUrl, foundInPicture(found.urls[0]), who, sender);
 }
 
 /** One forwarded message: acknowledgment, then the screenshot, then the verdict. */
@@ -152,17 +156,17 @@ export async function handleInbound(
 
   if (inbound.kind === "image") {
     if (!(await allowed())) return;
-    return handlePictures(inbound.pictures ?? [], out, analyzer, publicUrl, who);
+    return handlePictures(inbound.pictures ?? [], out, analyzer, publicUrl, who, policy?.sender);
   }
 
   const urls = extractUrls(inbound.text);
   if (urls.length > 0) {
     if (!(await allowed())) return;
-    return scanAndReply(urls, out, analyzer, publicUrl, OPENING, who);
+    return scanAndReply(urls, out, analyzer, publicUrl, OPENING, who, policy?.sender);
   }
   if (inbound.hasImage) {
     if (!(await allowed())) return;
-    return handlePictures(inbound.pictures ?? [], out, analyzer, publicUrl, who);
+    return handlePictures(inbound.pictures ?? [], out, analyzer, publicUrl, who, policy?.sender);
   }
   return out.sendText(NO_URL);
 }

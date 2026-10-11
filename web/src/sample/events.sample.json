@@ -1,0 +1,447 @@
+{
+  "description": "A recorded stream: four scans overlapping in time. Each item is {t_ms, event}: replay by waiting until t_ms after the start, then handling `event` exactly as an EventSource message of that `kind`. Addresses are defanged; `sender` is a mask, or null for the website.",
+  "events": [
+    {
+      "t_ms": 0,
+      "event": {
+        "id": 1,
+        "at": "2026-10-10T18:30:00.000Z",
+        "scan": "5a3c0de1f2b4",
+        "kind": "scan_started",
+        "sender": "•••-4412",
+        "data": {
+          "url": "hxxps://ezpass-pay[.]top/pay",
+          "source": "imessage"
+        }
+      }
+    },
+    {
+      "t_ms": 2500,
+      "event": {
+        "id": 2,
+        "at": "2026-10-10T18:30:02.500Z",
+        "scan": "c81d7e30a9f2",
+        "kind": "scan_started",
+        "sender": null,
+        "data": {
+          "url": "hxxps://example[.]com/",
+          "source": "web"
+        }
+      }
+    },
+    {
+      "t_ms": 6200,
+      "event": {
+        "id": 3,
+        "at": "2026-10-10T18:30:06.200Z",
+        "scan": "5a3c0de1f2b4",
+        "kind": "check_done",
+        "sender": "•••-4412",
+        "data": {
+          "check": "page_opened",
+          "outcome": "clear",
+          "detail": "The page loaded and was read"
+        }
+      }
+    },
+    {
+      "t_ms": 6300,
+      "event": {
+        "id": 4,
+        "at": "2026-10-10T18:30:06.300Z",
+        "scan": "5a3c0de1f2b4",
+        "kind": "screenshot_ready",
+        "sender": "•••-4412",
+        "data": {
+          "screenshot_url": "/shots/5a3c0de1f2b4.png"
+        }
+      }
+    },
+    {
+      "t_ms": 6900,
+      "event": {
+        "id": 5,
+        "at": "2026-10-10T18:30:06.900Z",
+        "scan": "5a3c0de1f2b4",
+        "kind": "check_done",
+        "sender": "•••-4412",
+        "data": {
+          "check": "threat_feeds",
+          "outcome": "flagged",
+          "detail": "Listed as phishing by OpenPhish"
+        }
+      }
+    },
+    {
+      "t_ms": 7400,
+      "event": {
+        "id": 6,
+        "at": "2026-10-10T18:30:07.400Z",
+        "scan": "5a3c0de1f2b4",
+        "kind": "check_done",
+        "sender": "•••-4412",
+        "data": {
+          "check": "domain_age",
+          "outcome": "flagged",
+          "detail": "Registered 2 days ago, from RDAP"
+        }
+      }
+    },
+    {
+      "t_ms": 7450,
+      "event": {
+        "id": 7,
+        "at": "2026-10-10T18:30:07.450Z",
+        "scan": "5a3c0de1f2b4",
+        "kind": "check_done",
+        "sender": "•••-4412",
+        "data": {
+          "check": "brand_match",
+          "outcome": "flagged",
+          "detail": "Web address uses the name E-ZPass but is not an official site (brand list)"
+        }
+      }
+    },
+    {
+      "t_ms": 7460,
+      "event": {
+        "id": 8,
+        "at": "2026-10-10T18:30:07.460Z",
+        "scan": "5a3c0de1f2b4",
+        "kind": "check_done",
+        "sender": "•••-4412",
+        "data": {
+          "check": "sensitive_form",
+          "outcome": "flagged",
+          "detail": "Page asks for card details"
+        }
+      }
+    },
+    {
+      "t_ms": 7470,
+      "event": {
+        "id": 9,
+        "at": "2026-10-10T18:30:07.470Z",
+        "scan": "5a3c0de1f2b4",
+        "kind": "check_done",
+        "sender": "•••-4412",
+        "data": {
+          "check": "platform_warning",
+          "outcome": "clear",
+          "detail": "The host shows no phishing warning for this page"
+        }
+      }
+    },
+    {
+      "t_ms": 8700,
+      "event": {
+        "id": 10,
+        "at": "2026-10-10T18:30:08.700Z",
+        "scan": "c81d7e30a9f2",
+        "kind": "check_done",
+        "sender": null,
+        "data": {
+          "check": "page_opened",
+          "outcome": "clear",
+          "detail": "The page loaded and was read"
+        }
+      }
+    },
+    {
+      "t_ms": 8800,
+      "event": {
+        "id": 11,
+        "at": "2026-10-10T18:30:08.800Z",
+        "scan": "c81d7e30a9f2",
+        "kind": "screenshot_ready",
+        "sender": null,
+        "data": {
+          "screenshot_url": "/shots/c81d7e30a9f2.png"
+        }
+      }
+    },
+    {
+      "t_ms": 9000,
+      "event": {
+        "id": 12,
+        "at": "2026-10-10T18:30:09.000Z",
+        "scan": "e04b6a15d377",
+        "kind": "scan_started",
+        "sender": "•••-0731",
+        "data": {
+          "url": "hxxps://gone[.]example/x",
+          "source": "imessage"
+        }
+      }
+    },
+    {
+      "t_ms": 9100,
+      "event": {
+        "id": 13,
+        "at": "2026-10-10T18:30:09.100Z",
+        "scan": "5a3c0de1f2b4",
+        "kind": "verdict",
+        "sender": "•••-4412",
+        "data": {
+          "verdict": "dangerous",
+          "score": 175,
+          "headline": "Dangerous: Listed as phishing by OpenPhish",
+          "explained_by": "template",
+          "report_path": "/r/5a3c0de1f2b4"
+        }
+      }
+    },
+    {
+      "t_ms": 9400,
+      "event": {
+        "id": 14,
+        "at": "2026-10-10T18:30:09.400Z",
+        "scan": "c81d7e30a9f2",
+        "kind": "check_done",
+        "sender": null,
+        "data": {
+          "check": "threat_feeds",
+          "outcome": "clear",
+          "detail": "Not listed by Google Safe Browsing, URLhaus or OpenPhish"
+        }
+      }
+    },
+    {
+      "t_ms": 9900,
+      "event": {
+        "id": 15,
+        "at": "2026-10-10T18:30:09.900Z",
+        "scan": "5a3c0de1f2b4",
+        "kind": "reply_sent",
+        "sender": "•••-4412",
+        "data": {
+          "delivered": true
+        }
+      }
+    },
+    {
+      "t_ms": 9900,
+      "event": {
+        "id": 16,
+        "at": "2026-10-10T18:30:09.900Z",
+        "scan": "c81d7e30a9f2",
+        "kind": "check_done",
+        "sender": null,
+        "data": {
+          "check": "domain_age",
+          "outcome": "clear",
+          "detail": "Registered 30 years ago, from RDAP"
+        }
+      }
+    },
+    {
+      "t_ms": 9950,
+      "event": {
+        "id": 17,
+        "at": "2026-10-10T18:30:09.950Z",
+        "scan": "c81d7e30a9f2",
+        "kind": "check_done",
+        "sender": null,
+        "data": {
+          "check": "brand_match",
+          "outcome": "clear",
+          "detail": "No brand imitation found"
+        }
+      }
+    },
+    {
+      "t_ms": 9960,
+      "event": {
+        "id": 18,
+        "at": "2026-10-10T18:30:09.960Z",
+        "scan": "c81d7e30a9f2",
+        "kind": "check_done",
+        "sender": null,
+        "data": {
+          "check": "sensitive_form",
+          "outcome": "clear",
+          "detail": "No sensitive form fields seen"
+        }
+      }
+    },
+    {
+      "t_ms": 9970,
+      "event": {
+        "id": 19,
+        "at": "2026-10-10T18:30:09.970Z",
+        "scan": "c81d7e30a9f2",
+        "kind": "check_done",
+        "sender": null,
+        "data": {
+          "check": "platform_warning",
+          "outcome": "clear",
+          "detail": "The host shows no phishing warning for this page"
+        }
+      }
+    },
+    {
+      "t_ms": 11600,
+      "event": {
+        "id": 20,
+        "at": "2026-10-10T18:30:11.600Z",
+        "scan": "c81d7e30a9f2",
+        "kind": "verdict",
+        "sender": null,
+        "data": {
+          "verdict": "no_red_flags",
+          "score": 0,
+          "headline": "No red flags found. That is not a guarantee.",
+          "explained_by": "template",
+          "report_path": "/r/c81d7e30a9f2"
+        }
+      }
+    },
+    {
+      "t_ms": 13000,
+      "event": {
+        "id": 21,
+        "at": "2026-10-10T18:30:13.000Z",
+        "scan": "7f29b3c8a1d0",
+        "kind": "scan_started",
+        "sender": null,
+        "data": {
+          "url": "hxxps://broken[.]example/",
+          "source": "web"
+        }
+      }
+    },
+    {
+      "t_ms": 15200,
+      "event": {
+        "id": 22,
+        "at": "2026-10-10T18:30:15.200Z",
+        "scan": "e04b6a15d377",
+        "kind": "check_done",
+        "sender": "•••-0731",
+        "data": {
+          "check": "page_opened",
+          "outcome": "unavailable",
+          "detail": "The address does not resolve (DNS lookup)"
+        }
+      }
+    },
+    {
+      "t_ms": 15900,
+      "event": {
+        "id": 23,
+        "at": "2026-10-10T18:30:15.900Z",
+        "scan": "e04b6a15d377",
+        "kind": "check_done",
+        "sender": "•••-0731",
+        "data": {
+          "check": "threat_feeds",
+          "outcome": "clear",
+          "detail": "Not listed by Google Safe Browsing, URLhaus or OpenPhish"
+        }
+      }
+    },
+    {
+      "t_ms": 16400,
+      "event": {
+        "id": 24,
+        "at": "2026-10-10T18:30:16.400Z",
+        "scan": "e04b6a15d377",
+        "kind": "check_done",
+        "sender": "•••-0731",
+        "data": {
+          "check": "domain_age",
+          "outcome": "clear",
+          "detail": "Registered 30 years ago, from RDAP"
+        }
+      }
+    },
+    {
+      "t_ms": 16450,
+      "event": {
+        "id": 25,
+        "at": "2026-10-10T18:30:16.450Z",
+        "scan": "e04b6a15d377",
+        "kind": "check_done",
+        "sender": "•••-0731",
+        "data": {
+          "check": "brand_match",
+          "outcome": "clear",
+          "detail": "No brand imitation found"
+        }
+      }
+    },
+    {
+      "t_ms": 16460,
+      "event": {
+        "id": 26,
+        "at": "2026-10-10T18:30:16.460Z",
+        "scan": "e04b6a15d377",
+        "kind": "check_done",
+        "sender": "•••-0731",
+        "data": {
+          "check": "sensitive_form",
+          "outcome": "clear",
+          "detail": "No sensitive form fields seen"
+        }
+      }
+    },
+    {
+      "t_ms": 16470,
+      "event": {
+        "id": 27,
+        "at": "2026-10-10T18:30:16.470Z",
+        "scan": "e04b6a15d377",
+        "kind": "check_done",
+        "sender": "•••-0731",
+        "data": {
+          "check": "platform_warning",
+          "outcome": "clear",
+          "detail": "The host shows no phishing warning for this page"
+        }
+      }
+    },
+    {
+      "t_ms": 18100,
+      "event": {
+        "id": 28,
+        "at": "2026-10-10T18:30:18.100Z",
+        "scan": "e04b6a15d377",
+        "kind": "verdict",
+        "sender": "•••-0731",
+        "data": {
+          "verdict": "couldnt_check",
+          "score": 10,
+          "headline": "Couldn't get a proper look at this link. Don't enter anything until you verify it another way.",
+          "explained_by": "template",
+          "report_path": "/r/e04b6a15d377"
+        }
+      }
+    },
+    {
+      "t_ms": 18900,
+      "event": {
+        "id": 29,
+        "at": "2026-10-10T18:30:18.900Z",
+        "scan": "e04b6a15d377",
+        "kind": "reply_sent",
+        "sender": "•••-0731",
+        "data": {
+          "delivered": true
+        }
+      }
+    },
+    {
+      "t_ms": 21200,
+      "event": {
+        "id": 30,
+        "at": "2026-10-10T18:30:21.200Z",
+        "scan": "7f29b3c8a1d0",
+        "kind": "scan_failed",
+        "sender": null,
+        "data": {
+          "detail": "The scan did not finish"
+        }
+      }
+    }
+  ]
+}

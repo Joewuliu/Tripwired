@@ -1,16 +1,21 @@
 """One scan: open the page, and gather what can be learned about the link while it loads."""
 import asyncio
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
 
 from access import judge_access
 from brands import check_brand
+from defang import defang_text
 from enrich import domain_age, registered_domain
 from feeds import check_feeds, failed, merge_results
 from interstitials import find_platform_warning
 from platforms import is_free_host, is_popular
 from sandbox import open_page
+from score import access_view, age_view, brand_view, feeds_view, fields_view, warning_view
+
+Emit = Callable[[str, dict], None]  # emit(kind, data): one live event; see events.py
 
 FEED_BUDGET_S = 3.0  # most a scan waits on threat feeds once the page itself is done
 
@@ -63,28 +68,48 @@ async def _age(host: str) -> dict:
     return await domain_age(host)
 
 
-async def scan(url: str, shot_path: Path) -> Scan:
+def _checked(emit: Emit | None, check: str, view: tuple[str, str]) -> None:
+    """Announce one finished check: its name, whether it flagged anything, and one plain sentence."""
+    if emit:
+        emit("check_done", {"check": check, "outcome": view[0], "detail": defang_text(view[1])})
+
+
+async def scan(url: str, shot_path: Path, emit: Emit | None = None) -> Scan:
     feeds_task = asyncio.create_task(check_feeds([url]))  # runs while the page loads
     try:
         opened = await open_page(url, shot_path)
     except BaseException:
         feeds_task.cancel()
         raise
+    access = judge_access(opened)
+    _checked(emit, "page_opened", access_view(access))
+    if emit and opened["has_screenshot"]:
+        emit("screenshot_ready", {"screenshot_url": f"/shots/{shot_path.stem}.png"})
     first_feeds = await _wait_for_feeds(feeds_task)
 
     final_url = opened["final_url"] or url
     later_urls = unchecked_chain(url, opened)
 
     async def later_feeds() -> list[dict]:
-        return await check_feeds(later_urls, timeout=FEED_BUDGET_S) if later_urls else []
+        found = await check_feeds(later_urls, timeout=FEED_BUDGET_S) if later_urls else []
+        _checked(emit, "threat_feeds", feeds_view(merge_results(first_feeds, found)))
+        return found
+
+    async def age_of(host: str) -> dict:
+        found = await _age(host)
+        _checked(emit, "domain_age", age_view(found))
+        return found
 
     final_host = urlsplit(final_url).hostname or ""
-    chain_feeds, age = await asyncio.gather(later_feeds(), _age(final_host))
+    chain_feeds, age = await asyncio.gather(later_feeds(), age_of(final_host))
     brand = check_brand(final_url, opened["title"] or "", opened["text"] or "")
+    fields = opened.get("sensitive_fields", [])
+    warning = find_platform_warning(opened["title"], opened["text"])
+    _checked(emit, "brand_match", brand_view(brand))
+    _checked(emit, "sensitive_form", fields_view(fields))
+    _checked(emit, "platform_warning", warning_view(warning))
     return Scan(
         url=url, final_url=final_url, opened=opened, feeds=merge_results(first_feeds, chain_feeds), age=age,
         brand=brand, popular=is_popular(final_host, registered_domain(final_host)),
-        fields=opened.get("sensitive_fields", []),
-        warning=find_platform_warning(opened["title"], opened["text"]),
-        access=judge_access(opened),
+        fields=fields, warning=warning, access=access,
     )

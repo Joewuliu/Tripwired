@@ -329,3 +329,53 @@ def judge(scan) -> Judgement:
         evidence=items,
         points_table=[PointsRule(id=i, label=label, points=p) for i, label, p in RULES],
     )
+
+
+# --- one-line views of single checks, for the live event stream --------------------------------
+# Each takes what one check found and returns (outcome, sentence), outcome being "flagged",
+# "clear" or "unavailable". They reuse the wording above so the stream and the report agree; they
+# add no points and decide nothing.
+
+def _view(items: list[Evidence], if_empty: str) -> tuple[str, str]:
+    flagged = next((e for e in items if e.points > 0), None)
+    if flagged:
+        return "flagged", flagged.label
+    unseen = next((e for e in items if e.id.startswith(("feed_error", "feed_not_checked"))), None)
+    if unseen:
+        return "unavailable", unseen.label
+    return "clear", items[0].label if items else if_empty
+
+
+def feeds_view(feeds: list[dict]) -> tuple[str, str]:
+    return _view(_feeds(feeds), "No threat feed was checked")
+
+
+def age_view(age: dict) -> tuple[str, str]:
+    if age.get("age_days") is None:
+        return "unavailable", _age(age)[0].label
+    return _view(_age(age), "")
+
+
+def access_view(access: dict | None) -> tuple[str, str]:
+    """Could the sandbox see the page? None from judge_access means yes."""
+    if not access:
+        return "clear", "The page loaded and was read"
+    return "unavailable", _access(access)[0].label
+
+
+def brand_view(findings: list[dict]) -> tuple[str, str]:
+    official = any(f["type"] == "official" for f in findings)
+    return _view(_brands(findings, official), "No brand imitation found")
+
+
+def fields_view(fields: list[dict]) -> tuple[str, str]:
+    asked = [_ASKS_FOR[kind] for kind in kinds_asked_for(fields)]
+    if asked:
+        return "flagged", f"Page asks for {_names(asked)}"
+    return "clear", "No sensitive form fields seen"
+
+
+def warning_view(warning: str | None) -> tuple[str, str]:
+    if warning:
+        return "flagged", _warning(warning)[0].label
+    return "clear", "The host shows no phishing warning for this page"

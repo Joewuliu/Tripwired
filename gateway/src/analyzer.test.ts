@@ -90,3 +90,32 @@ test("readImage: an unexpected status is treated as unavailable", async () => {
   const base = await start((_req, res) => void res.setHeader("content-type", "application/json").end(JSON.stringify({ status: "weird", urls: [] })));
   assert.deepEqual(await createAnalyzer(base).readImage(Buffer.from([1]), "image/png"), { status: "unavailable", urls: [] });
 });
+
+test("analyze sends the sender as hash and last four digits only", async () => {
+  let body = "";
+  const base = await start((req, res) => {
+    req.on("data", (chunk) => (body += chunk));
+    req.on("end", () => res.setHeader("content-type", "application/json").end(JSON.stringify(GOOD)));
+  });
+  await createAnalyzer(base).analyze("https://example.com", { hash: "3f9a1c2e7b4d5a60", last4: "4412" });
+  assert.deepEqual(JSON.parse(body), {
+    urls: ["https://example.com"],
+    sender: { hash: "3f9a1c2e7b4d5a60", last4: "4412" },
+  });
+});
+
+test("replySent posts the scan id and sender to the internal route, and never throws", async () => {
+  let seen = "";
+  const base = await start((req, res) => {
+    let body = "";
+    req.on("data", (chunk) => (body += chunk));
+    req.on("end", () => {
+      seen = `${req.method} ${req.url} ${body}`;
+      res.writeHead(204).end();
+    });
+  });
+  await createAnalyzer(base).replySent("abc123abc123", { hash: "3f9a1c2e7b4d5a60", last4: null });
+  assert.equal(seen, `POST /internal/reply-sent {"scan":"abc123abc123","sender":{"hash":"3f9a1c2e7b4d5a60","last4":null}}`);
+  await new Promise((resolve) => server!.close(resolve));
+  await createAnalyzer(base).replySent("abc123abc123"); // nobody is listening: still fine
+});

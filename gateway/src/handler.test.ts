@@ -39,14 +39,22 @@ function recorder(): { out: Outbox; sent: string[] } {
   };
 }
 
-function fakeAnalyzer(overrides: Partial<Analyzer> = {}): Analyzer & { asked: string[] } {
+function fakeAnalyzer(
+  overrides: Partial<Analyzer> = {},
+): Analyzer & { asked: string[]; senders: unknown[]; replies: unknown[] } {
   const asked: string[] = [];
+  const senders: unknown[] = [];
+  const replies: unknown[] = [];
   return {
     asked,
-    analyze: async (url) => {
+    senders,
+    replies,
+    analyze: async (url, sender) => {
       asked.push(url);
+      senders.push(sender);
       return RESULT;
     },
+    replySent: async (scan, sender) => void replies.push({ scan, sender }),
     fetchScreenshot: async () => Buffer.from([1, 2, 3, 4]),
     readImage: async () => ({ status: "ok", urls: [] }),
     ...overrides,
@@ -230,7 +238,7 @@ const NUMBER = "+1 (919) 555-4412";
 
 function policyFor(raw: string, limiter: RateLimiter) {
   const sender = createHasher("a-long-enough-test-salt-0123456789", () => {}).identify(raw);
-  return { label: label(sender), limit: limiter.limit, take: () => limiter.take(sender.hash) };
+  return { sender, label: label(sender), limit: limiter.limit, take: () => limiter.take(sender.hash) };
 }
 
 test("the eleventh check in an hour gets the friendly reply and no scan", async () => {
@@ -303,4 +311,39 @@ test("no raw number reaches a log line, even when the analyzer fails with it in 
   assert.match(joined, /rate limited [0-9a-f]{8} •••-4412/);
   assert.match(joined, /checking hxxps:\/\/example\[\.\]com for [0-9a-f]{8} •••-4412/);
   assert.ok(!/919|555-4412|5554412|me@example/.test(joined), joined);
+});
+
+test("the analyzer is given the hash and last four digits, and told when the reply went out", async () => {
+  const analyzer = fakeAnalyzer();
+  const policy = policyFor(NUMBER, new RateLimiter(10));
+  const { out, sent } = recorder();
+  const order: string[] = [];
+  const spied = { ...analyzer, replySent: async (scan: string, sender?: unknown) => {
+    order.push(`replySent after ${sent.length} messages`);
+    await analyzer.replySent(scan, sender as never);
+  } };
+  await handleInbound({ kind: "text", text: "https://example.com" }, out, spied, undefined, policy);
+  assert.deepEqual(analyzer.senders, [policy.sender]);
+  assert.deepEqual(Object.keys(policy.sender).sort(), ["hash", "last4"]);
+  assert.equal(policy.sender.last4, "4412");
+  assert.ok(!JSON.stringify(analyzer.senders).includes("555"));
+  assert.deepEqual(analyzer.replies, [{ scan: "abc123abc123", sender: policy.sender }]);
+  assert.deepEqual(order, ["replySent after 3 messages"]); // acknowledgment, screenshot, verdict: then the event
+});
+
+test("a link read from a picture also carries the sender and reports its reply", async () => {
+  const analyzer = fakeAnalyzer({ readImage: async () => ({ status: "ok", urls: ["https://usps-track.top/x"] }) });
+  const policy = policyFor(NUMBER, new RateLimiter(10));
+  await handleInbound({ kind: "image", pictures: [picture()] }, recorder().out, analyzer, undefined, policy);
+  assert.deepEqual(analyzer.senders, [policy.sender]);
+  assert.equal(analyzer.replies.length, 1);
+});
+
+test("a limited message produces no scan and no reply event", async () => {
+  const analyzer = fakeAnalyzer();
+  const policy = policyFor(NUMBER, new RateLimiter(1));
+  await handleInbound({ kind: "text", text: "https://a.example" }, recorder().out, analyzer, undefined, policy);
+  await handleInbound({ kind: "text", text: "https://b.example" }, recorder().out, analyzer, undefined, policy);
+  assert.equal(analyzer.asked.length, 1);
+  assert.equal(analyzer.replies.length, 1);
 });

@@ -458,6 +458,31 @@ docker compose logs gateway --since 1h | grep -E '\+?[0-9][0-9 ()-]{8,}[0-9]'   
 docker compose logs gateway --since 1h | grep -E 'checking|rate limited'          # hash + •••-last4
 ```
 
+## Watching the live event stream
+
+`GET https://<your-host>.sslip.io/events` is a Server-Sent Events stream: one event per step of every
+scan (`scan_started`, a `check_done` for each check, `screenshot_ready`, `verdict`, `reply_sent`,
+`scan_failed`). It is read-only (other methods get 405) and public, so it carries only what a
+report already shows: defanged addresses, the verdict and its plain sentences, and the sender as a
+mask (`•••-4412`). Never the number or its hash. The last 300 events are kept in the analyzer's
+memory: a new connection gets the most recent 60, and a reconnect with `Last-Event-ID` (or
+`?since=<id>`) gets what it missed. A restart clears them.
+
+**From your laptop, during a phone scan** (PowerShell; `curl.exe` streams, `Invoke-RestMethod` does not):
+
+```powershell
+curl.exe -N -s https://34-123-45-67.sslip.io/events | Select-String '^(event|data):'
+```
+
+Leave it running, then text the line a link. Within a second you see `scan_started`, then the
+checks as they finish, `screenshot_ready`, `verdict` (about 9 seconds in), and `reply_sent` with
+`•••-` and your last four digits once the verdict message has gone out. Ctrl+C stops it. A scan from
+the website's paste box shows `"sender": null` and `"source": "web"`.
+
+Quick checks: `curl.exe -s -o NUL -w "%{http_code}" -X POST https://<host>/events` is `405`;
+`.../internal/reply-sent`, `.../analyze` and `.../read-image` are `404`. If events arrive in
+bursts instead of one by one, Caddy is buffering: check `flush_interval -1` on the `/events` block.
+
 ## Updating
 
 After you commit and push from the laptop (Option A), or repeat the Option B copy:

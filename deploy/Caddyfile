@@ -33,8 +33,27 @@
 		reverse_proxy analyzer:8001
 	}
 
-	# Anything else under /api, and the gateway's own /analyze, is not a public route: answer 404
-	# here rather than letting it fall through to the web app.
+	# The live event stream (Server-Sent Events), read-only: GET only, one event per step of every
+	# scan, addresses defanged and senders masked (•••-4412). flush_interval -1 sends each event as
+	# it happens; Content-Encoding is set so the gzip above leaves the stream alone. Open to any
+	# page on purpose: it is public data, and a dashboard being designed on a laptop can read it.
+	@events {
+		path /events
+		method GET
+	}
+	handle @events {
+		reverse_proxy analyzer:8001 {
+			flush_interval -1
+			header_down Content-Encoding identity
+			header_down Access-Control-Allow-Origin *
+		}
+	}
+	handle /events {
+		respond "Method not allowed" 405
+	}
+
+	# Anything else under /api, and the routes the gateway uses over the private network, are not
+	# public: answer 404 here rather than letting them fall through to the web app.
 	handle /api/* {
 		respond "Not found" 404
 	}
@@ -42,6 +61,9 @@
 		respond "Not found" 404
 	}
 	handle /read-image {
+		respond "Not found" 404
+	}
+	handle /internal/* {
 		respond "Not found" 404
 	}
 

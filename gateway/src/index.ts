@@ -51,7 +51,7 @@ async function main(): Promise<void> {
     if (message.direction === "outbound" || alreadySeen(message.id)) continue;
     // The number is hashed here and goes no further: only the hash and its last four digits are kept.
     const sender = hasher.identify(message.sender?.id ?? space.id ?? "");
-    const policy: Policy = { label: label(sender), limit: limiter.limit, take: () => limiter.take(sender.hash) };
+    const policy: Policy = { sender, label: label(sender), limit: limiter.limit, take: () => limiter.take(sender.hash) };
     // Not awaited: one slow scan must not hold up the next message.
     handleInbound(toInbound(message.content), outboxFor(space), undefined, undefined, policy).catch((error) =>
       console.error("message failed:", redact(error instanceof Error ? error.message : String(error))),

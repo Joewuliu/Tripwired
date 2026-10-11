@@ -1,4 +1,5 @@
 import type { AnalysisResult } from "./reply";
+import type { SenderId } from "./sender";
 
 const ANALYZE_TIMEOUT_MS = 45_000;
 const SCREENSHOT_TIMEOUT_MS = 10_000;
@@ -12,7 +13,10 @@ export interface PictureReading {
 }
 
 export interface Analyzer {
-  analyze(url: string): Promise<AnalysisResult>;
+  /** Scan a link. The sender (a hash and the last four digits, never the number) only labels live events. */
+  analyze(url: string, sender?: SenderId): Promise<AnalysisResult>;
+  /** Tell the analyzer the reply went out, so the live stream can show it. Never throws. */
+  replySent(scanId: string, sender?: SenderId): Promise<void>;
   readImage(bytes: Buffer, mimeType: string): Promise<PictureReading>;
   fetchScreenshot(path: string): Promise<Buffer>;
 }
@@ -69,18 +73,31 @@ function parse(body: unknown): AnalysisResult {
 
 export function createAnalyzer(base = process.env.ANALYZER_URL || DEFAULT_BASE): Analyzer {
   return {
-    async analyze(url) {
+    async analyze(url, sender) {
       try {
         const response = await fetch(new URL("/analyze", base), {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ urls: [url] }),
+          body: JSON.stringify({ urls: [url], ...(sender ? { sender } : {}) }),
           signal: AbortSignal.timeout(ANALYZE_TIMEOUT_MS),
         });
         if (!response.ok) throw new Error(`analyzer returned ${response.status}`);
         return parse(await response.json());
       } catch (error) {
         throw classify(error, base);
+      }
+    },
+
+    async replySent(scanId, sender) {
+      try {
+        await fetch(new URL("/internal/reply-sent", base), {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ scan: scanId, ...(sender ? { sender } : {}) }),
+          signal: AbortSignal.timeout(5_000),
+        });
+      } catch {
+        // the event stream is a view, not part of the reply: losing one event costs nothing
       }
     },
 
