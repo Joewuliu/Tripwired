@@ -588,6 +588,33 @@ restarts for a few seconds) and the website box's counts. Reports, screenshots a
 untouched; a browser's hidden scans are remembered by that browser, so use a private window or clear
 the site's data there if you want them back.
 
+## Accuracy check for the write-up
+
+`scripts/accuracy.py` sends a list of links through the analyzer's `/analyze` (the call a phone text
+uses, over the Docker network, not through iMessage) and writes `docs/accuracy.md` and
+`docs/accuracy.csv`: for each link the verdict, the score, the verdict **without blocklists**
+(recomputed from the same scan's evidence with threat-feed points removed, so judges can see what
+the sandbox catches by itself), the top two signals and the seconds. Under the table it counts scams
+flagged, legit sites with "No red flags found" and the median time; a link that comes back
+"Couldn't check" is listed on its own line and counts as neither right nor wrong. Every address is
+defanged. It opens live phishing pages, so it refuses to run unless `TRIPWIRE_EVAL_OK=1` is in the
+VM's `.env` (switch it back off afterwards, as for `live_check.py`).
+
+```bash
+cd ~/tripwire
+# TRIPWIRE_EVAL_OK=1 in .env first
+python3 scripts/accuracy.py --fresh 10          # the 5 legit sites in scripts/accuracy_urls.txt + 10 recent scams
+less docs/accuracy.md
+```
+
+Defaults: one link at a time, 3 seconds apart, at most 15 links (`--max N` for more, `--pause S`).
+`--fresh N` takes N recent links from OpenPhish and URLhaus (the URLhaus half needs
+`URLHAUS_AUTH_KEY` in `.env`; without it all come from OpenPhish). Put your own links in
+`scripts/accuracy_urls.txt` as `scam,https://…` or `legit,https://…`. Gemini stays on (the analyzer has
+no per-request switch); the output says how many answers it worded, and the verdicts do not depend on
+it. Each run is stored as ordinary reports and shows on the dashboard. It talks to the analyzer at
+`172.30.0.10:8001`; set `ANALYZER_URL` or `--analyzer` if the network address ever changes.
+
 ## Updating
 
 After you commit and push from the laptop (Option A), or repeat the Option B copy:

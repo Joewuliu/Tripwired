@@ -1,0 +1,8 @@
+# label,url      label is "scam" or "legit"; blank lines and # comments are ignored.
+# Read by scripts/accuracy.py. Scams go through the live sandbox, so run it only on the VM.
+# Recent scam links can be added automatically with: python3 scripts/accuracy.py --fresh N
+legit,https://www.wellsfargo.com
+legit,https://www.amazon.com
+legit,https://www.unc.edu
+legit,https://www.usps.com
+legit,https://www.apple.com
