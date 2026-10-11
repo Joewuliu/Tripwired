@@ -1,8 +1,9 @@
-/* The live dashboard: a sky over grass (the wallpaper), bubbles rising in it, a glass panel beside
-   it. Colours, sizes and artwork come from theme.css. */
+/* The live dashboard: a sky over grass (the wallpaper) with bubbles rising in it and the counts down
+   its left edge, and Report Summary down the right of the screen. Colours, sizes and artwork come
+   from theme.css. */
 .dash {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(360px, 36vw, 520px);
+  grid-template-columns: minmax(0, 1fr) clamp(360px, 36vw, 540px);
   grid-template-rows: auto minmax(0, 1fr);
   gap: var(--gap);
   height: 100vh;
@@ -12,7 +13,7 @@
 }
 
 .dash-top {
-  grid-column: 1 / -1;
+  grid-column: 1;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -52,15 +53,76 @@
   background: var(--suspicious);
 }
 
+.view-toggle {
+  display: inline-flex;
+  margin-left: auto;
+}
+
+.view-toggle .button {
+  border-radius: 0;
+}
+
+.view-toggle .button:first-child {
+  border-radius: var(--radius-button) 0 0 var(--radius-button);
+}
+
+.view-toggle .button:last-child {
+  margin-left: -1px;
+  border-radius: 0 var(--radius-button) var(--radius-button) 0;
+}
+
+.view-toggle .button[aria-pressed='true'] {
+  color: var(--on-colour);
+  border-color: var(--accent-deep);
+  background: linear-gradient(180deg, var(--accent-top), var(--accent-bottom));
+}
+
+.button.small {
+  min-height: 34px;
+  padding: 4px 12px;
+  font-size: 0.8rem;
+}
+
+.badge-pending {
+  --badge: var(--muted);
+  --badge-fill: var(--glass-strong);
+  --badge-edge: var(--glass-line);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* --- The sky -------------------------------------------------------------------------------- */
+
+.sky {
+  position: relative;
+  grid-column: 1;
+  grid-row: 2;
+  min-height: 0;
+  margin: 0 0 -16px -16px; /* out to the window's edge, so bubbles leave the grass itself */
+  overflow: hidden;
+}
+
+/* The counts: a column of glass tiles down the left edge of the sky */
 .dash-stats {
+  position: absolute;
+  left: 16px;
+  top: 0;
+  z-index: 3;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 8px;
-  margin: 0 0 0 auto;
+  width: var(--stats-width);
+  margin: 0;
 }
 
 .stat {
-  min-width: 84px;
   padding: 6px 12px;
   border: 1px solid var(--glass-edge);
   border-radius: var(--radius-field);
@@ -71,14 +133,15 @@
 .stat dt {
   font-size: 0.68rem;
   font-weight: 650;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
+  line-height: 1.25;
   text-transform: uppercase;
   color: var(--faint);
 }
 
 .stat dd {
   margin: 0;
-  font-size: 1.3rem;
+  font-size: 1.35rem;
   font-weight: 650;
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
@@ -97,15 +160,6 @@
   color: var(--unknown);
 }
 
-/* --- The sky -------------------------------------------------------------------------------- */
-
-.sky {
-  position: relative;
-  min-height: 0;
-  margin: 0 -16px -16px; /* out to the window's edge, so bubbles leave the grass itself */
-  overflow: hidden;
-}
-
 .bubble {
   position: absolute;
   width: var(--bubble-size);
@@ -119,8 +173,12 @@
   background: var(--bubble-fill), var(--bubble-tint, var(--bubble-tint-scanning));
   box-shadow: inset 2px 3px 5px rgba(255, 255, 255, 0.87), inset -5px -7px 12px rgba(46, 145, 172, 0.2),
     0 10px 24px rgba(35, 125, 150, 0.18);
+  touch-action: none; /* a finger on a bubble drags it instead of scrolling the page */
+  user-select: none;
+  -webkit-user-select: none;
   transition:
     bottom 1.6s cubic-bezier(0.16, 1, 0.3, 1),
+    left 0.6s ease,
     opacity 1.2s ease,
     transform 0.25s ease;
   animation: emerge 1s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -146,6 +204,18 @@
 .bubble.selected {
   border-color: var(--accent);
   box-shadow: inset 2px 3px 5px rgba(255, 255, 255, 0.87), 0 0 0 3px var(--highlight), 0 12px 26px rgba(35, 125, 150, 0.28);
+}
+
+/* While it is held it follows the pointer exactly, above everything else in the sky */
+.bubble.dragging {
+  z-index: 5;
+  transition: none;
+  transform: scale(1.1);
+  box-shadow: inset 2px 3px 5px rgba(255, 255, 255, 0.87), 0 18px 34px rgba(20, 70, 95, 0.38);
+}
+
+.bubble.dragging .bubble-body {
+  animation-play-state: paused;
 }
 
 .bubble.leaving {
@@ -198,24 +268,18 @@
 }
 
 .bubble-host {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .bubble-state {
-  line-height: 1.15;
-  text-align: center;
-}
-
-.bubble-host {
-  font-family: var(--font-mono);
-  font-size: 0.66rem;
-}
-
-.bubble-state {
   font-size: 0.74rem;
   font-weight: 650;
+  line-height: 1.15;
+  text-align: center;
 }
 
 .bubble-dangerous .bubble-state {
@@ -323,9 +387,155 @@
   animation: flash 5s linear infinite;
 }
 
-/* --- The sandbox panel ---------------------------------------------------------------------- */
+/* The trash can in the grass at the bottom left: drop a bubble on it to remove that scan */
+.trash {
+  position: absolute;
+  left: 16px;
+  bottom: 22px;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  width: var(--stats-width);
+  padding: 10px 6px 8px;
+  border: 1px dashed var(--glass-edge);
+  border-radius: var(--radius-field);
+  color: var(--muted);
+  background: var(--glass-strong);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-align: center;
+  transition:
+    transform 0.2s ease,
+    background 0.2s ease;
+}
 
-.sandbox {
+.trash svg {
+  width: 30px;
+  height: 30px;
+}
+
+.trash.armed {
+  border-color: var(--dangerous);
+  color: var(--dangerous);
+}
+
+.trash.over {
+  transform: scale(1.12);
+  background: var(--dangerous-fill);
+  border-style: solid;
+}
+
+/* Said for a few seconds after a removal, with the way back */
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: calc(100% - 32px);
+  margin: 0;
+  padding: 8px 10px 8px 16px;
+  transform: translateX(-50%);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--radius-field);
+  background: var(--glass-solid);
+  box-shadow: var(--shadow-lift);
+  font-size: 0.85rem;
+  animation: reveal 0.25s ease both;
+}
+
+/* --- The list view --------------------------------------------------------------------------- */
+
+.scan-list {
+  position: absolute;
+  inset: 0 0 32px calc(var(--stats-width) + 32px);
+  margin: 0;
+  padding: 8px;
+  overflow: auto;
+  background: var(--glass-strong);
+  scrollbar-width: thin;
+}
+
+.scan-list-empty {
+  padding: 24px;
+  color: var(--muted);
+}
+
+.scan-list table {
+  background: none;
+  font-size: 0.85rem;
+}
+
+.scan-list th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--glass-solid);
+}
+
+.scan-list td {
+  vertical-align: middle;
+}
+
+.scan-list tbody tr {
+  cursor: var(--cursor-active);
+}
+
+.scan-list tbody tr:hover {
+  background: rgba(127, 227, 235, 0.18);
+}
+
+.scan-list tr.selected {
+  background: rgba(127, 227, 235, 0.32);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.scan-list td:nth-child(3),
+.scan-list td:nth-child(4) {
+  white-space: nowrap;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.row-link {
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+
+.row-remove {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  color: var(--muted);
+  background: none;
+}
+
+.row-remove svg {
+  width: 18px;
+  height: 18px;
+}
+
+.row-remove:hover,
+.row-remove:focus-visible {
+  color: var(--dangerous);
+  border-color: var(--dangerous-edge);
+  background: var(--dangerous-fill);
+}
+
+/* --- Report Summary: the whole height of the screen, on the right -------------------------- */
+
+.summary {
+  grid-column: 2;
+  grid-row: 1 / 3;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -333,68 +543,83 @@
   overflow: hidden;
 }
 
-/* The screenshot, as a phone, beside the evidence lines */
-.sandbox-live {
-  flex: 1 1 auto;
-  display: grid;
-  grid-template-columns: 40% minmax(0, 1fr);
-  gap: 12px;
-  min-height: 0;
-  margin-top: 10px;
-}
-
-.sandbox h2 {
+.summary h2 {
   margin: 0;
 }
 
-.sandbox-head {
+.summary-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
 
-.button.small {
-  min-height: 32px;
-  padding: 4px 12px;
-  font-size: 0.78rem;
+.summary-head .badge {
+  margin: 0;
+  font-size: 0.9rem;
 }
 
-.sandbox-link {
-  margin: 6px 0 0;
+.summary-link {
+  margin: 8px 0 0;
 }
 
-.sandbox-from,
-.sandbox-empty {
+.summary-from,
+.summary-empty {
   margin: 2px 0 0;
   font-size: 0.82rem;
   color: var(--muted);
 }
 
-.shot-frame {
+/* The screenshot at its own proportions, with the evidence lines beside it */
+.summary-live {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: fit-content(46%) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
   min-height: 0;
-  padding: 6px;
+  margin-top: 12px;
+}
+
+/* A tall screen has room for a bigger picture */
+@media (min-height: 900px) {
+  .summary-live {
+    grid-template-columns: fit-content(56%) minmax(0, 1fr);
+  }
+}
+
+/* The frame takes the picture's shape: no fixed height, so there is never an empty band under it */
+.shot-frame {
+  padding: 5px;
   border: 1px solid var(--glass-line);
   border-radius: var(--radius-field);
   background: var(--glass-strong);
-  overflow: hidden; /* a long page shows from its top, at the width of the phone */
+  line-height: 0;
 }
 
 .shot-frame img {
   display: block;
-  width: 100%;
+  width: auto;
   height: auto;
-  border-radius: 6px;
+  max-width: 100%;
+  max-height: var(--shot-max-height);
+  border-radius: 8px;
 }
 
 .shot-empty {
-  margin: 40% 0 0;
-  font-size: 0.85rem;
+  width: 9.5em;
+  margin: 0;
+  padding: 14px 10px;
+  border: 1px dashed var(--glass-line);
+  border-radius: var(--radius-field);
+  font-size: 0.8rem;
   color: var(--muted);
   text-align: center;
 }
 
 .ticker {
+  align-self: stretch;
   min-height: 0;
   margin: 0;
   padding: 0;
@@ -451,30 +676,23 @@
   border-bottom: 0;
 }
 
-.sandbox-verdict {
+.summary-foot {
   flex: 0 0 auto;
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px solid var(--glass-line);
 }
 
-.sandbox-verdict .badge {
-  margin: 0;
-  font-size: 0.9rem;
+.summary-foot p {
+  margin: 0 0 6px;
 }
 
-.sandbox-verdict p {
-  margin: 6px 0 0;
-}
-
-.sandbox-headline {
+.summary-headline {
   font-weight: 600;
   line-height: 1.35;
 }
 
 .reply-line {
-  flex: 0 0 auto;
-  margin: 8px 0 0;
   font-size: 0.85rem;
   color: var(--muted);
 }
@@ -482,6 +700,21 @@
 .reply-line.sent {
   font-weight: 650;
   color: var(--live);
+}
+
+.button.remove {
+  gap: 6px;
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.button.remove svg {
+  width: 16px;
+  height: 16px;
+}
+
+.button.remove:hover:not(:disabled) {
+  color: var(--dangerous);
 }
 
 /* --- Motion --------------------------------------------------------------------------------- */
@@ -550,12 +783,12 @@
 @keyframes reveal {
   from {
     opacity: 0;
-    transform: translateY(4px);
   }
 }
 
-/* Reduced motion: nothing moves or flashes. Bubbles sit where they belong, the check dots inside
-   each bubble carry what the sparkles showed, and the storm cloud stays as a still picture. */
+/* Reduced motion: nothing moves or flashes. Bubbles sit where they belong (and still follow a
+   drag, which is the viewer's own movement), the check dots inside each bubble carry what the
+   sparkles showed, and the storm cloud stays as a still picture. */
 @media (prefers-reduced-motion: reduce) {
   .dash *,
   .dash *::before,
@@ -571,28 +804,24 @@
 @media (max-width: 900px) {
   .dash {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto 56vh auto;
+    grid-template-rows: auto 62vh auto;
     height: auto;
     overflow: visible;
   }
   .sky {
     margin: 0 -16px;
   }
-  .dash-stats {
-    margin-left: 0;
-  }
-  .sandbox-live {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .shot-frame {
-    max-height: 300px;
+  .summary {
+    grid-column: 1;
+    grid-row: 3;
   }
 }
 
 @media (forced-colors: active) {
   .bubble,
   .stat,
-  .dash-status {
+  .dash-status,
+  .trash {
     border: 1px solid ButtonText;
   }
 }

@@ -488,13 +488,21 @@ bursts instead of one by one, Caddy is buffering: check `flush_interval -1` on t
 `https://<your-host>.sslip.io/dashboard` is the full-screen view for a laptop or a projector: each
 scan is a glass bubble that leaves the grass, climbs as its checks finish, and takes the colour of
 its verdict (red under storm clouds for Dangerous, amber for Suspicious, aqua for No red flags
-found, frosted grey for Couldn't check). Beside it are the sandbox screenshot, one line per check,
-the verdict, and "Reply sent to •••-4412"; the running totals are along the top. It reads `/events`
-on the same host and reconnects by itself. Click a bubble to keep the panel on that scan.
+found, frosted grey for Couldn't check). Its title is "Phish Finder". Down the right, Report Summary
+shows the selected scan: its verdict, the sandbox screenshot, one line per check, and "Reply sent
+to •••-4412". The counts are down the left. It reads `/events` on the same host and reconnects by
+itself.
+
+Click a bubble to keep Report Summary on that scan (click it again to follow the latest). Bubbles
+can be dragged; dropping one on the trash can, or "Remove from this dashboard" in Report Summary,
+takes that scan off this screen, with a few seconds to undo. That only hides it in this browser
+(remembered across reloads): the stored report, the phone reply and every other viewer are
+untouched. "List" in the header shows every scan as rows instead, newest first.
 
 `/dashboard?replay=1` plays a bundled recording on a loop instead (no scan, no network), for
-rehearsing or if the venue's network fails; add `&speed=2` to play it faster. A viewer who has
-asked their system for reduced motion gets the same information with nothing moving or flashing.
+rehearsing or if the venue's network fails; add `&speed=2` to play it faster, `&loop=0` to play it
+once. A viewer who has asked their system for reduced motion gets the same information with
+nothing moving or flashing.
 
 ## Updating
 

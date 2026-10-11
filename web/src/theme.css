@@ -91,7 +91,9 @@
 
   /* The live dashboard: bubble size, the tint a bubble takes for each verdict (under its glass
      shine), the storm over a dangerous one, and the sparkle a finished check gives off */
-  --bubble-size: 136px;
+  --bubble-size: clamp(112px, 8.6vw, 150px);
+  --stats-width: 132px; /* the column of counts, and the trash can under it */
+  --shot-max-height: min(52vh, 600px); /* the tallest a screenshot is drawn in Report Summary */
   --bubble-tint-scanning: rgba(255, 255, 255, 0.14);
   --bubble-tint-dangerous: rgba(196, 34, 62, 0.66);
   --bubble-tint-suspicious: rgba(240, 168, 36, 0.62);
