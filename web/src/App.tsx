@@ -1,3 +1,4 @@
+import { CardGallery, CardPage } from './pages/Card.tsx'
 import { Dashboard } from './pages/Dashboard.tsx'
 import { Home } from './pages/Home.tsx'
 import { NotFound } from './pages/NotFound.tsx'
@@ -9,6 +10,10 @@ export default function App() {
   switch (route.name) {
     case 'home':
       return <Home />
+    case 'card':
+      return <CardPage id={route.id} />
+    case 'card-gallery':
+      return <CardGallery />
     case 'dashboard':
       return <Dashboard />
     case 'report':

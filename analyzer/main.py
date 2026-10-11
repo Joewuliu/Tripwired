@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 import secrets
@@ -6,7 +7,7 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from pydantic import BaseModel, Field, StringConstraints
 
 from brands import BRANDS
@@ -15,6 +16,7 @@ from defang import defang, defang_text
 from env import load_root_env
 from events import Sender, bus, sender_from
 from explain import explain
+from og import ensure_og, public_origin, share_html
 from pipeline import scan
 from plain import plain_line, plain_lines
 from public_check import RateLimiter, normalize
@@ -32,6 +34,7 @@ SCAN_ID = re.compile(r"[a-f0-9]{12}")
 
 app = FastAPI(title="Tripwire analyzer")
 _public_limit = RateLimiter()
+_background: set[asyncio.Task] = set()  # preview pictures being drawn; held so they are not collected mid-way
 
 
 def _reports_dir() -> Path:
@@ -127,6 +130,10 @@ async def _scan_and_store(url: str, sender: Sender | None = None, source: str = 
         save_report(_reports_dir(), analysis)
     except Exception as exc:  # a full disk must cost the report link, not the verdict
         log.error("report %s was not saved: %s", scan_id, type(exc).__name__)
+    # The link-preview picture is drawn after the answer has gone: it must never hold up a reply.
+    task = asyncio.create_task(ensure_og(analysis, DATA_DIR))
+    _background.add(task)
+    task.add_done_callback(_background.discard)
     emit("verdict", {
         "verdict": analysis.verdict, "score": analysis.score, "headline": defang_text(analysis.headline),
         "explained_by": analysis.explained_by, "report_path": f"/r/{scan_id}",
@@ -250,6 +257,29 @@ async def report(report_id: str) -> AnalysisResult:
     if stored is None:
         raise HTTPException(status_code=404)
     return stored
+
+
+@app.get("/og/{report_id}.png")
+async def og_image(report_id: str) -> FileResponse:
+    """The 1200 x 630 picture a shared report link shows. Read-only; made once and kept. If a preview
+    asks before the picture is ready, it is drawn now and the request waits for it."""
+    stored = load_report(_reports_dir(), report_id)
+    path = await ensure_og(stored, DATA_DIR) if stored else None
+    if path is None:
+        raise HTTPException(status_code=404)
+    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/share/{report_id}", response_class=HTMLResponse)
+async def share(report_id: str, request: Request) -> HTMLResponse:
+    """What a link-preview program gets for /r/<id> (Caddy sends it here; people get the web app):
+    a small page of Open Graph tags pointing at the picture above. Every value in it is escaped."""
+    stored = load_report(_reports_dir(), report_id)
+    if stored is None:
+        raise HTTPException(status_code=404)
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+    origin = public_origin(host, request.headers.get("x-forwarded-proto") or request.url.scheme)
+    return HTMLResponse(share_html(stored, origin), headers={"Cache-Control": "public, max-age=300"})
 
 
 @app.get("/health")

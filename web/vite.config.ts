@@ -13,6 +13,7 @@ export default defineConfig({
       '/api': analyzer,
       '/shots': analyzer,
       '/events': analyzer,
+      '/og': analyzer,
     },
   },
 })

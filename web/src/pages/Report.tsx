@@ -4,6 +4,7 @@ import { fetchReport } from '../api.ts'
 import { parseReport } from '../contract.ts'
 import type { Report } from '../contract.ts'
 import { remember } from '../history.ts'
+import { setShareTags } from '../share.ts'
 import sampleJson from '../sample/report.sample.json'
 import { VERDICT_LABEL, VERDICT_NOTE } from '../verdict.ts'
 import { Brand } from './Brand.tsx'
@@ -24,6 +25,12 @@ function useReport(id: string): Load {
       if (controller.signal.aborted) return
       if (result.kind === 'ok') {
         remember(result.report)
+        setShareTags({
+          title: 'Phish Finder: ' + VERDICT_LABEL[result.report.verdict],
+          description: result.report.headline,
+          image: '/og/' + id + '.png',
+          path: '/r/' + id,
+        })
         setLoad({ kind: 'ready', report: result.report })
       } else {
         setLoad(result)

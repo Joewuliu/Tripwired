@@ -106,6 +106,41 @@
   --sparkle-glow: #7fe3eb;
   --live: #17654a;
 
+  /* The verdict card (/r/<id>/card). Its surface is nearly opaque so its text keeps its contrast
+     over any wallpaper; every text colour here is at least 4.5:1 on it (web/src/card.test.ts checks).
+     Each verdict has a text colour and a badge fill. "Clear" is aqua, never green. The -dark set is
+     used when the viewer's device is in dark mode. */
+  --card-alpha: 0.94;
+  --card-surface: #f4fcff;
+  --card-ink: #123447;
+  --card-muted: #36576a;
+  --card-link: #24506a;
+  --card-edge: #83b6c8;
+  --card-dangerous: #8a1832;
+  --card-dangerous-fill: #fde8ee;
+  --card-suspicious: #754500;
+  --card-suspicious-fill: #fff1cf;
+  --card-clear: #0b5e77;
+  --card-clear-fill: #e0f3fd;
+  --card-unknown: #465264;
+  --card-unknown-fill: #edf1f5;
+  --card-dark-surface: #0f2a3a;
+  --card-dark-ink: #eaf6fb;
+  --card-dark-muted: #b9d3df;
+  --card-dark-link: #a9d5e8;
+  --card-dark-edge: #3f6b80;
+  --card-dark-dangerous: #ffc2ce;
+  --card-dark-dangerous-fill: #6b1429;
+  --card-dark-suspicious: #ffdf9e;
+  --card-dark-suspicious-fill: #5c3a00;
+  --card-dark-clear: #bfeafb;
+  --card-dark-clear-fill: #0a4a61;
+  --card-dark-unknown: #dbe3ec;
+  --card-dark-unknown-fill: #3a4656;
+  --card-width: 390px;
+  --card-thumb-width: 92px;
+  --card-thumb-height: 124px; /* the frame; a taller screenshot shows from its top, never squashed */
+
   /* Type */
   --font: 'Segoe UI', -apple-system, BlinkMacSystemFont, Arial, sans-serif;
   --font-display: 'Fredoka', 'Arial Rounded MT Bold', sans-serif;

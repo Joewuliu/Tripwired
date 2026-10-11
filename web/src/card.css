@@ -1,0 +1,406 @@
+/* The verdict card. Colours, sizes and the font come from theme.css; this file only arranges them
+   and picks the light or the dark set. */
+.vcard {
+  --surface: var(--card-surface);
+  --ink: var(--card-ink);
+  --muted: var(--card-muted);
+  --link: var(--card-link);
+  --edge: var(--card-edge);
+  --dangerous: var(--card-dangerous);
+  --dangerous-fill: var(--card-dangerous-fill);
+  --suspicious: var(--card-suspicious);
+  --suspicious-fill: var(--card-suspicious-fill);
+  --clear: var(--card-clear);
+  --clear-fill: var(--card-clear-fill);
+  --unknown: var(--card-unknown);
+  --unknown-fill: var(--card-unknown-fill);
+  --shine: rgba(255, 255, 255, 0.9);
+
+  position: relative;
+  display: block;
+  width: 100%;
+  max-width: var(--card-width);
+  padding: 10px 12px 11px 16px;
+  overflow: hidden;
+  border: 1px solid var(--edge);
+  border-radius: var(--radius);
+  color: var(--ink);
+  font-family: var(--font);
+  line-height: 1.3;
+  text-decoration: none;
+  background: color-mix(in srgb, var(--surface) calc(var(--card-alpha) * 100%), transparent);
+  box-shadow: inset 0 2px 0 var(--shine), var(--shadow);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  cursor: var(--cursor-active);
+}
+
+/* Dark: when the device asks for it, or when a page forces it (the gallery's switch) */
+@media (prefers-color-scheme: dark) {
+  .vcard:not([data-scheme='light']) {
+    --surface: var(--card-dark-surface);
+    --ink: var(--card-dark-ink);
+    --muted: var(--card-dark-muted);
+    --link: var(--card-dark-link);
+    --edge: var(--card-dark-edge);
+    --dangerous: var(--card-dark-dangerous);
+    --dangerous-fill: var(--card-dark-dangerous-fill);
+    --suspicious: var(--card-dark-suspicious);
+    --suspicious-fill: var(--card-dark-suspicious-fill);
+    --clear: var(--card-dark-clear);
+    --clear-fill: var(--card-dark-clear-fill);
+    --unknown: var(--card-dark-unknown);
+    --unknown-fill: var(--card-dark-unknown-fill);
+    --shine: rgba(255, 255, 255, 0.14);
+  }
+}
+
+.vcard[data-scheme='dark'] {
+  --surface: var(--card-dark-surface);
+  --ink: var(--card-dark-ink);
+  --muted: var(--card-dark-muted);
+  --link: var(--card-dark-link);
+  --edge: var(--card-dark-edge);
+  --dangerous: var(--card-dark-dangerous);
+  --dangerous-fill: var(--card-dark-dangerous-fill);
+  --suspicious: var(--card-dark-suspicious);
+  --suspicious-fill: var(--card-dark-suspicious-fill);
+  --clear: var(--card-dark-clear);
+  --clear-fill: var(--card-dark-clear-fill);
+  --unknown: var(--card-dark-unknown);
+  --unknown-fill: var(--card-dark-unknown-fill);
+  --shine: rgba(255, 255, 255, 0.14);
+}
+
+/* Each state sets one colour pair; the stripe, the badge and the action line all use it */
+.vcard-dangerous {
+  --tone: var(--dangerous);
+  --tone-fill: var(--dangerous-fill);
+}
+.vcard-suspicious {
+  --tone: var(--suspicious);
+  --tone-fill: var(--suspicious-fill);
+}
+.vcard-no_red_flags,
+.vcard-scanning {
+  --tone: var(--clear);
+  --tone-fill: var(--clear-fill);
+}
+.vcard-couldnt_check {
+  --tone: var(--unknown);
+  --tone-fill: var(--unknown-fill);
+}
+
+/* The coloured stripe down the left edge */
+.vcard::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 6px;
+  background: var(--tone);
+}
+
+.vcard > * {
+  position: relative; /* above the rising bubbles of the scanning state */
+}
+
+.vcard-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.vcard .wordmark {
+  font-size: 22px;
+  white-space: nowrap;
+}
+
+/* The gradient wordmark is made for a light plate; on the dark card it is one light colour */
+.vcard[data-scheme='dark'] .wordmark {
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  -webkit-text-stroke: 0;
+  color: var(--clear);
+}
+
+@media (prefers-color-scheme: dark) {
+  .vcard:not([data-scheme='light']) .wordmark {
+    background: none;
+    -webkit-text-fill-color: currentColor;
+    -webkit-text-stroke: 0;
+    color: var(--clear);
+  }
+}
+
+.vcard-badge {
+  flex-shrink: 0;
+  padding: 3px 11px;
+  border: 1px solid var(--tone);
+  border-radius: var(--radius-pill);
+  color: var(--tone);
+  background: var(--tone-fill);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.vcard-headline {
+  display: -webkit-box;
+  margin: 6px 0 7px;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.vcard-body {
+  display: grid;
+  grid-template-columns: var(--card-thumb-width) minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+/* Phone-shaped: the screenshot at its own proportions, from the top, in a rounded frame */
+.vcard-thumb {
+  width: var(--card-thumb-width);
+  max-height: var(--card-thumb-height);
+  overflow: hidden;
+  border: 2px solid var(--edge);
+  border-radius: 12px;
+  background: var(--tone-fill);
+  line-height: 0;
+}
+
+.vcard-thumb img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.vcard-thumb.empty {
+  display: grid;
+  place-items: center;
+  height: var(--card-thumb-height);
+  padding: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.vcard-reasons {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.vcard-reasons li {
+  display: -webkit-box;
+  padding-left: 13px;
+  overflow: hidden;
+  text-indent: -13px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.vcard-reasons li::before {
+  content: '•';
+  display: inline-block;
+  width: 13px;
+  color: var(--tone);
+  font-weight: 700;
+  text-indent: 0;
+}
+
+.vcard-link {
+  display: block;
+  margin-top: 7px;
+  overflow: hidden;
+  color: var(--link);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  unicode-bidi: isolate;
+}
+
+.vcard-action {
+  margin: 4px 0 0;
+  color: var(--tone);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+/* --- Scanning: a shimmering empty picture and lines, and bubbles rising behind them ------------- */
+
+.vcard-shimmer {
+  background: linear-gradient(100deg, var(--tone-fill) 30%, var(--shine) 50%, var(--tone-fill) 70%) 0 0 / 250% 100%;
+  animation: vcard-shimmer 1.6s linear infinite;
+}
+
+.vcard-thumb.vcard-shimmer {
+  height: var(--card-thumb-height);
+}
+
+.vcard-line {
+  height: 11px;
+  border-radius: 6px;
+}
+
+.vcard-line:nth-child(2) {
+  width: 82%;
+}
+
+.vcard-line:nth-child(3) {
+  width: 64%;
+}
+
+.vcard-bubbles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.vcard-bubbles i {
+  position: absolute;
+  bottom: -30px;
+  border: 1px solid var(--tone);
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 25%, var(--shine), transparent 60%);
+  opacity: 0.45;
+  animation: vcard-rise 5s ease-in infinite;
+}
+
+.vcard-bubbles i:nth-child(1) {
+  left: 12%;
+  width: 18px;
+  height: 18px;
+}
+.vcard-bubbles i:nth-child(2) {
+  left: 46%;
+  width: 26px;
+  height: 26px;
+  animation-delay: 1.4s;
+}
+.vcard-bubbles i:nth-child(3) {
+  left: 70%;
+  width: 14px;
+  height: 14px;
+  animation-delay: 2.6s;
+}
+.vcard-bubbles i:nth-child(4) {
+  left: 88%;
+  width: 22px;
+  height: 22px;
+  animation-delay: 3.7s;
+}
+
+@keyframes vcard-shimmer {
+  to {
+    background-position: -250% 0;
+  }
+}
+
+@keyframes vcard-rise {
+  to {
+    transform: translateY(-340px);
+    opacity: 0;
+  }
+}
+
+/* Still under reduced motion: no shimmer, and the bubbles rest part-way up instead of rising */
+@media (prefers-reduced-motion: reduce) {
+  .vcard-shimmer,
+  .vcard-bubbles i {
+    animation: none;
+  }
+  .vcard-bubbles i:nth-child(1) {
+    bottom: 38%;
+  }
+  .vcard-bubbles i:nth-child(2) {
+    bottom: 12%;
+  }
+  .vcard-bubbles i:nth-child(3) {
+    bottom: 58%;
+  }
+  .vcard-bubbles i:nth-child(4) {
+    bottom: 26%;
+  }
+}
+
+@media (forced-colors: active) {
+  .vcard,
+  .vcard-badge,
+  .vcard-thumb {
+    border: 1px solid CanvasText;
+  }
+}
+
+/* --- The pages that show cards ------------------------------------------------------------------ */
+
+.card-page {
+  display: grid;
+  justify-items: center;
+  padding: 10px;
+}
+
+.card-gallery {
+  padding: 20px 16px 48px;
+}
+
+.card-gallery-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--gap);
+  margin-bottom: 8px;
+}
+
+.card-gallery-head .brand {
+  margin: 0;
+}
+
+.card-gallery-note {
+  max-width: 70ch;
+  margin: 0 0 16px;
+  padding: 10px 14px;
+}
+
+.card-gallery-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.card-gallery-item {
+  width: var(--card-width);
+  max-width: 100%;
+}
+
+.card-gallery-item h2 {
+  width: fit-content;
+  margin: 0 0 6px;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--glass-strong);
+  font-size: 0.85rem;
+}
+
+.card-gallery-item img.og {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  border-radius: 10px;
+}

@@ -532,6 +532,26 @@ docker compose logs gateway --since 1h | grep family       # hash + •••-la
 
 The dashboard's Report Summary shows `Guardian •••-4412 alerted` when an alert goes out.
 
+## The verdict card and link previews
+
+`/r/<id>/card` is a compact card for one report (wordmark, verdict badge, headline, a phone-shaped
+thumbnail beside up to three plain reasons, the defanged link, one line of what to do). Until the
+report exists it shows a "Checking…" state. `/card-gallery` shows all five states at once from
+sample data, with a Light/Dark switch, for reviewing the design.
+
+A shared `/r/<id>` link shows a preview picture: `/og/<id>.png`, 1200 x 630, drawn by the analyzer
+from the same design the first time it is needed and kept in `data/og/`. Programs that build
+previews (Messages, Slack and so on) are recognised by Caddy and given a small page of Open Graph
+tags from the analyzer instead of the web app; people always get the web app. To see what a
+preview program sees:
+
+```powershell
+curl.exe -s -A "facebookexternalhit/1.1" https://34-123-45-67.sslip.io/r/<id> | Select-String "og:"
+curl.exe -s -o $env:TEMP\og.png https://34-123-45-67.sslip.io/og/<id>.png; Start-Process $env:TEMP\og.png
+```
+
+Old pictures can be removed with the screenshots: `sudo find data/og -name '*.png' -mtime +7 -delete`.
+
 ## Demo day
 
 **The line's name and photo.** The Photon SDK can only share the line's existing contact card

@@ -21,6 +21,25 @@
 		reverse_proxy analyzer:8001
 	}
 
+	# The picture a shared report link shows (og:image), by the report's 12-hex id. Read-only: the
+	# analyzer answers GET only, draws each picture once and keeps it.
+	handle /og/*.png {
+		reverse_proxy analyzer:8001
+	}
+
+	# Link previews. Programs that build a preview (Messages, Slack, and the like) do not run the web
+	# app's scripts, so for a report or its card they are given the analyzer's small page of Open
+	# Graph tags instead. Only a 12-hex id and a known preview program match; everyone else, and
+	# every other address, gets the web app below.
+	@preview {
+		path_regexp report ^/r/([a-f0-9]{12})(/card)?/?$
+		header_regexp User-Agent (?i)(facebookexternalhit|facebot|twitterbot|slackbot|discordbot|whatsapp|telegrambot|linkedinbot|skypeuripreview|iframely|embedly)
+	}
+	handle @preview {
+		rewrite * /share/{re.report.1}
+		reverse_proxy analyzer:8001
+	}
+
 	# A finished scan's report, as JSON, by its 12-hex id (what the report page fetches). The
 	# analyzer's route is GET-only, so it answers 405 to anything else, and 404 to an unknown id.
 	handle /api/report/* {
