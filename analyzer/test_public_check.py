@@ -76,3 +76,16 @@ def test_a_visitor_cannot_choose_their_own_bucket_with_a_spoofed_header(client, 
     second = {"X-Forwarded-For": "2.2.2.2, 203.0.113.7"}
     assert client.post("/api/check", json={"url": "short.example"}, headers=first).status_code == 200
     assert client.post("/api/check", json={"url": "short.example"}, headers=second).status_code == 429
+
+
+def test_resetting_the_limits_gives_the_box_a_clean_hour_and_touches_nothing_else(client, monkeypatch):  # noqa: F811
+    fake_world(monkeypatch)
+    monkeypatch.setattr(main, "_public_limit", RateLimiter(per_visitor=1, overall=10))
+    mine = {"X-Forwarded-For": "203.0.113.7"}
+    first = client.post("/api/check", json={"url": "short.example"}, headers=mine)
+    assert first.status_code == 200
+    assert client.post("/api/check", json={"url": "short.example"}, headers=mine).status_code == 429
+    assert client.post("/internal/reset-limits").status_code == 204
+    main._public_limit.per_visitor = 1  # the fresh limiter has the production numbers; tighten it again
+    assert client.post("/api/check", json={"url": "short.example"}, headers=mine).status_code == 200
+    assert client.get(f"/api/report/{first.json()['id']}").status_code == 200  # the earlier report is still there

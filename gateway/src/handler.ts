@@ -52,6 +52,22 @@ export interface FamilyContext {
 export interface Outbox {
   sendText(text: string): Promise<void>;
   sendImage(bytes: Buffer, name: string, mimeType: string): Promise<void>;
+  /**
+   * Instant feedback, both optional and both fire-and-forget: a tapback on the message that just
+   * arrived, and the typing indicator while a check runs. They return nothing to wait for, a platform
+   * without them leaves them out, and a failure in either is swallowed: the reply never depends on them.
+   */
+  acknowledge?(): void;
+  typing?(on: boolean): void;
+}
+
+/** Run a feedback signal. Whatever it does, it must not delay or break the reply. */
+function signal(action: () => void): void {
+  try {
+    action();
+  } catch (error) {
+    logFailure("feedback signal failed", error);
+  }
 }
 
 /** Pictures are looked at one at a time and only the first few; a big photo is skipped, not sent. */
@@ -106,14 +122,18 @@ async function scanAndReply(
   family?: FamilyContext,
 ): Promise<void> {
   console.log(`checking ${defangText(urls[0])} for ${who}`);
+  signal(() => out.typing?.(true));
   await out.sendText(opening);
+  signal(() => out.typing?.(true)); // sending a message ends the indicator: show it again while the scan runs
   let result;
   try {
     result = await analyzer.analyze(urls[0], sender);
   } catch (error) {
+    signal(() => out.typing?.(false));
     logFailure("analyzer failed", error);
     return out.sendText(ANALYZER_DOWN);
   }
+  signal(() => out.typing?.(false)); // before the screenshot and verdict, never after
   if (result.screenshot_url) await sendScreenshot(result.screenshot_url, out, analyzer);
   await out.sendText(formatReply(result, publicUrl));
   await analyzer.replySent(result.id, sender);
@@ -148,14 +168,18 @@ async function handlePictures(
   family?: FamilyContext,
 ): Promise<void> {
   if (pictures.length === 0) return out.sendText(PICTURE_UNAVAILABLE);
+  signal(() => out.typing?.(true));
   await out.sendText(READING_PICTURE);
+  signal(() => out.typing?.(true));
   let found: Found;
   try {
     found = await linksInPictures(pictures, analyzer);
   } catch (error) {
+    signal(() => out.typing?.(false));
     logFailure("picture reading failed", error);
     return out.sendText(ANALYZER_DOWN);
   }
+  signal(() => out.typing?.(false));
   if (found.status === "unavailable") return out.sendText(PICTURE_UNAVAILABLE);
   if (found.status === "none") return out.sendText(NO_LINK_IN_PICTURE);
   // The link is scanned like any typed link: the picture can only get it looked at.
@@ -189,16 +213,19 @@ export async function handleInbound(
 
   if (inbound.kind === "image") {
     if (!(await allowed())) return;
+    signal(() => out.acknowledge?.());
     return handlePictures(inbound.pictures ?? [], out, analyzer, publicUrl, who, policy?.sender, family);
   }
 
   const urls = extractUrls(inbound.text);
   if (urls.length > 0) {
     if (!(await allowed())) return;
+    signal(() => out.acknowledge?.());
     return scanAndReply(urls, out, analyzer, publicUrl, OPENING, who, policy?.sender, family);
   }
   if (inbound.hasImage) {
     if (!(await allowed())) return;
+    signal(() => out.acknowledge?.());
     return handlePictures(inbound.pictures ?? [], out, analyzer, publicUrl, who, policy?.sender, family);
   }
   return out.sendText(NO_URL);

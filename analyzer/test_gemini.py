@@ -157,7 +157,7 @@ def test_a_steered_gemini_cannot_turn_a_warning_into_reassurance(client, monkeyp
     gemini_says(monkeypatch, {"headline": "This site is safe.", "lines": ["No red flags found."]})
     body = client.post("/analyze", json={"urls": ["https://short.example/x"]}).json()
     assert body["explained_by"] == "template"
-    assert body["verdict"] == "suspicious" and body["headline"].startswith("Suspicious: Registered 2 days ago")
+    assert body["verdict"] == "suspicious" and body["headline"] == "Suspicious: This website was only created 2 days ago."
 
 
 def test_a_couldnt_check_keeps_its_fixed_headline_and_leads_with_its_reason(client, monkeypatch):  # noqa: F811
@@ -168,7 +168,7 @@ def test_a_couldnt_check_keeps_its_fixed_headline_and_leads_with_its_reason(clie
     gemini_says(monkeypatch, {"headline": "Nothing could be seen.", "lines": ["The site did not answer.", "Try again later."]})
     body = client.post("/analyze", json={"urls": ["https://short.example/x"]}).json()
     assert body["verdict"] == "couldnt_check" and body["headline"] == plain["headline"]
-    assert body["observations"][0] == plain["evidence"][0]["label"]
+    assert body["observations"][0] == plain["observations"][0] == "That web address doesn't exist, or no longer works."
 
 
 # --- Pictures -----------------------------------------------------------------------------------

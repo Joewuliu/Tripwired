@@ -67,11 +67,11 @@ async function linked() {
 test("protect sends an invite with the guardian masked, and links nothing", async () => {
   const w = world();
   const reply = await w.say(YOU, "protect +1 919 555 0142");
-  assert.match(reply, /Invite sent to •••-0142\. It's pending/);
+  assert.match(reply, /I've asked •••-0142. Nothing happens unless they reply YES within 24 hours/);
   assert.equal(w.sent.length, 1);
   assert.equal(w.sent[0].to, GRANDMA);
-  assert.match(w.sent[0].text, /someone at •••-4412 asked/);
-  assert.match(w.sent[0].text, /Reply YES to agree, or ignore this message/);
+  assert.match(w.sent[0].text, /the person at •••-4412 asked to be told/);
+  assert.match(w.sent[0].text, /Reply YES to allow this, or ignore this message/);
   assert.ok(!w.sent[0].text.includes("9195554412"));
   assert.deepEqual(await w.family.alertGuardians(hasher.identify(GRANDMA), DANGEROUS, HOST), []); // not linked yet
 });
@@ -80,9 +80,9 @@ test("YES links both and tells both; only then do alerts flow", async () => {
   const w = world();
   await w.say(YOU, "protect (919) 555-0142");
   const reply = await w.say(GRANDMA, "yes");
-  assert.match(reply, /You're linked\. •••-4412 will get an alert only when a link you forward is rated Dangerous/);
-  assert.match(reply, /Text STOP any time/);
-  assert.match(w.to(YOU).at(-1)!, /•••-0142 said YES/);
+  assert.match(reply, /Done. •••-4412 will be told only when a link you send me is dangerous/);
+  assert.match(reply, /Reply STOP any time/);
+  assert.match(w.to(YOU).at(-1)!, /•••-0142 said YES. You'll be told if a link they send me is dangerous/);
   const told = await w.family.alertGuardians(hasher.identify(GRANDMA), DANGEROUS, HOST);
   assert.deepEqual(told, [hasher.identify(YOU)]);
 });
@@ -121,11 +121,11 @@ test("after an ignored invite the same guardian must wait 24 more hours; another
   const w = world();
   await w.say(YOU, "protect +1 919 555 0142");
   w.clock.now += INVITE_TTL_MS + 1;
-  assert.match(await w.say(YOU, "protect +1 919 555 0142"), /didn't agree last time.*can't ask them again for about 24 hours/);
+  assert.match(await w.say(YOU, "protect +1 919 555 0142"), /didn't say yes last time.*can't ask again for about 24 hours/);
   assert.equal(w.to(GRANDMA).length, 1); // no second invite reached them
-  assert.match(await w.say("+19195557777", "protect +1 919 555 0142"), /Invite sent/);
+  assert.match(await w.say("+19195557777", "protect +1 919 555 0142"), /I've asked/);
   w.clock.now += COOLDOWN_MS + 1;
-  assert.match(await w.say(YOU, "protect +1 919 555 0142"), /Invite sent/);
+  assert.match(await w.say(YOU, "protect +1 919 555 0142"), /I've asked/);
 });
 
 test("STOP to an invite declines it and starts the same wait", async () => {
@@ -133,38 +133,38 @@ test("STOP to an invite declines it and starts the same wait", async () => {
   await w.say(YOU, "protect +1 919 555 0142");
   assert.match(await w.say(GRANDMA, "STOP"), /Done\./);
   assert.match(await w.say(GRANDMA, "YES"), /no request waiting/);
-  assert.match(await w.say(YOU, "protect +1 919 555 0142"), /can't ask them again/);
+  assert.match(await w.say(YOU, "protect +1 919 555 0142"), /can't ask again/);
 });
 
 // --- stopping, from either side ------------------------------------------------------------------
 
 test("STOP from the protected person unlinks at once and tells the guardian", async () => {
   const w = await linked();
-  assert.match(await w.say(GRANDMA, "stop"), /nobody gets alerts about your links/);
-  assert.deepEqual(w.to(YOU), ["Phish Finder: •••-0142 turned off alerts. You're no longer linked."]);
+  assert.match(await w.say(GRANDMA, "stop"), /Nobody will be told about your links any more/);
+  assert.deepEqual(w.to(YOU), ["Phish Finder: •••-0142 turned off alerts. You won't be told about their links any more."]);
   assert.deepEqual(await w.family.alertGuardians(hasher.identify(GRANDMA), DANGEROUS, HOST), []);
-  assert.match(await w.say(YOU, "protect +1 919 555 0142"), /can't ask them again/); // and cannot be re-invited for a day
+  assert.match(await w.say(YOU, "protect +1 919 555 0142"), /can't ask again/); // and cannot be re-invited for a day
 });
 
 test("unprotect from the guardian unlinks and tells the protected person", async () => {
   const w = await linked();
-  assert.match(await w.say(YOU, "unprotect +1 919 555 0142"), /no longer get alerts for •••-0142/);
-  assert.deepEqual(w.to(GRANDMA), ["Phish Finder: •••-4412 will no longer get alerts about your links."]);
+  assert.match(await w.say(YOU, "unprotect +1 919 555 0142"), /won't be told about •••-0142's links any more/);
+  assert.deepEqual(w.to(GRANDMA), ["Phish Finder: •••-4412 won't be told about your links any more."]);
   assert.deepEqual(await w.family.alertGuardians(hasher.identify(GRANDMA), DANGEROUS, HOST), []);
-  assert.match(await w.say(YOU, "unprotect +1 919 555 0142"), /aren't getting alerts/);
+  assert.match(await w.say(YOU, "unprotect +1 919 555 0142"), /aren't told about/);
 });
 
 test("STOP from the guardian also ends their links, and tells the person", async () => {
   const w = await linked();
   await w.say(YOU, "STOP");
-  assert.match(w.to(GRANDMA)[0], /•••-4412 will no longer get alerts/);
+  assert.match(w.to(GRANDMA)[0], /•••-4412 won't be told about your links/);
   assert.deepEqual(await w.family.alertGuardians(hasher.identify(GRANDMA), DANGEROUS, HOST), []);
 });
 
 test("unprotect cancels a pending invite; STOP with nothing to stop says so", async () => {
   const w = world();
   await w.say(YOU, "protect +1 919 555 0142");
-  assert.match(await w.say(YOU, "unprotect 9195550142"), /invite to •••-0142 is cancelled/);
+  assert.match(await w.say(YOU, "unprotect 9195550142"), /cancelled the request to •••-0142/);
   assert.match(await w.say(GRANDMA, "YES"), /no request waiting/);
   assert.match(await w.say("+19195558888", "STOP"), /nothing to stop/);
 });
@@ -173,21 +173,21 @@ test("unprotect cancels a pending invite; STOP with nothing to stop says so", as
 
 test("a guardian can send three invites an hour", async () => {
   const w = world();
-  for (const n of [1, 2, 3]) assert.match(await w.say(YOU, `protect +1 919 555 020${n}`), /Invite sent/);
-  assert.match(await w.say(YOU, "protect +1 919 555 0204"), /3 invites an hour/);
+  for (const n of [1, 2, 3]) assert.match(await w.say(YOU, `protect +1 919 555 020${n}`), /I've asked/);
+  assert.match(await w.say(YOU, "protect +1 919 555 0204"), /3 people an hour/);
   assert.equal(w.sent.length, 3);
   w.clock.now += HOUR + 1;
-  assert.match(await w.say(YOU, "protect +1 919 555 0204"), /Invite sent/);
+  assert.match(await w.say(YOU, "protect +1 919 555 0204"), /I've asked/);
 });
 
 test("a guardian can protect at most five people, counting pending invites", async () => {
   const w = world();
   for (let n = 1; n <= 5; n++) {
-    assert.match(await w.say(YOU, `protect +1 919 555 030${n}`), /Invite sent/);
+    assert.match(await w.say(YOU, `protect +1 919 555 030${n}`), /I've asked/);
     await w.say(`+1919555030${n}`, "YES");
     w.clock.now += 25 * 60 * 1000; // stay under three an hour
   }
-  assert.match(await w.say(YOU, "protect +1 919 555 0306"), /up to 5 people/);
+  assert.match(await w.say(YOU, "protect +1 919 555 0306"), /look after up to 5 people/);
 });
 
 test("a person can have at most three guardians", async () => {
@@ -203,9 +203,9 @@ test("a person can have at most three guardians", async () => {
 test("asking twice does not send a second invite", async () => {
   const w = world();
   await w.say(YOU, "protect +1 919 555 0142");
-  assert.match(await w.say(YOU, "protect +1 919 555 0142"), /already been asked/);
+  assert.match(await w.say(YOU, "protect +1 919 555 0142"), /already asked •••-0142/);
   await w.say(GRANDMA, "YES");
-  assert.match(await w.say(YOU, "protect +1 919 555 0142"), /already get alerts/);
+  assert.match(await w.say(YOU, "protect +1 919 555 0142"), /already told about •••-0142/);
   assert.equal(w.to(GRANDMA).length, 1);
 });
 
@@ -262,9 +262,9 @@ test("family lists links from both sides with masked numbers only", async () => 
   const w = await linked();
   await w.say(YOU, "protect +1 919 555 0199");
   const mine = await w.say(YOU, "family");
-  assert.match(mine, /You get alerts for: •••-0142, •••-0199 \(pending\)/);
-  assert.match(await w.say(GRANDMA, "family"), /Alerts about your links go to: •••-4412/);
-  assert.match(await w.say("+19195550199", "family"), /Waiting for your YES: •••-4412/);
+  assert.match(mine, /You're told about links sent to: •••-0142, •••-0199 \(pending\)/);
+  assert.match(await w.say(GRANDMA, "family"), /told if you're sent a dangerous link: •••-4412/);
+  assert.match(await w.say("+19195550199", "family"), /waiting for your YES: •••-4412/);
   assert.match(await w.say("+19195558888", "family"), /You have no family links/);
   assert.ok(!/919555/.test(mine));
 });
@@ -361,10 +361,10 @@ test("a command is answered as one and scans nothing; ordinary words still get t
   const analyzer = fakeAnalyzer(DANGEROUS);
   const first = recorder();
   await handleInbound({ kind: "text", text: "protect +1 919 555 0142" }, first.out, analyzer, HOST, undefined, { service: w.family, me: person(YOU) });
-  assert.match(first.sent[0], /Invite sent to •••-0142/);
+  assert.match(first.sent[0], /I've asked •••-0142/);
   const second = recorder();
   await handleInbound({ kind: "text", text: "hello?" }, second.out, analyzer, HOST, undefined, { service: w.family, me: person(YOU) });
-  assert.match(second.sent[0], /Forward me a suspicious text or link/);
+  assert.match(second.sent[0], /Send me a text or link you're not sure about/);
   assert.match(second.sent[0], /protect and their mobile number/);
   assert.deepEqual(analyzer.asked, []);
 });

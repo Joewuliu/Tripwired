@@ -31,8 +31,8 @@ export interface Courier {
 type Reply = (text: string) => Promise<void>;
 type Identify = (raw: string) => SenderId;
 
-const USAGE = "To protect someone, text: protect and their mobile number, like protect +1 919 555 0142";
-const UNPROTECT_USAGE = "To stop, text: unprotect and their number, like unprotect +1 919 555 0142";
+const USAGE = "To look after someone, text: protect and their mobile number, like: protect +1 919 555 0142";
+const UNPROTECT_USAGE = "To stop, text: unprotect and their number, like: unprotect +1 919 555 0142";
 
 function hours(ms: number): string {
   const n = Math.max(1, Math.ceil(ms / HOUR_MS));
@@ -132,22 +132,22 @@ export class Family {
     const them = this.identify(number);
     const pair = { guardian: me.hash, protected: them.hash };
     const theirMask = mask(them);
-    if (them.hash === me.hash) return reply("That's your own number. Text the number of the person you want to protect.");
-    if (this.data.links.some((l) => same(l, pair))) return reply(`You already get alerts for ${theirMask}.`);
+    if (them.hash === me.hash) return reply("That's your own number. Please text the number of the person you want to look after.");
+    if (this.data.links.some((l) => same(l, pair))) return reply(`You're already told about ${theirMask}'s links.`);
     if (this.data.invites.some((i) => same(i, pair))) {
-      return reply(`${theirMask} has already been asked. It's pending until they reply YES.`);
+      return reply(`I've already asked ${theirMask}. I'm waiting for their YES.`);
     }
     const cooldown = this.data.cooldowns.find((c) => same(c, pair));
     if (cooldown) {
-      return reply(`${theirMask} didn't agree last time, so I can't ask them again for about ${hours(cooldown.until - this.now())}.`);
+      return reply(`${theirMask} didn't say yes last time, so I can't ask again for about ${hours(cooldown.until - this.now())}.`);
     }
     const sent = this.data.inviteTimes[me.hash] ?? [];
     if (sent.length >= INVITES_PER_HOUR) {
-      return reply(`You can send ${INVITES_PER_HOUR} invites an hour. Try again in about ${hours(HOUR_MS - (this.now() - sent[0]))}.`);
+      return reply(`You can ask ${INVITES_PER_HOUR} people an hour. Please try again in about ${hours(HOUR_MS - (this.now() - sent[0]))}.`);
     }
     const mine = [...this.data.links, ...this.data.invites].filter((p) => p.guardian === me.hash).length;
     if (mine >= MAX_PROTECTED) {
-      return reply(`You can protect up to ${MAX_PROTECTED} people. Text "family" to see them, or unprotect one first.`);
+      return reply(`You can look after up to ${MAX_PROTECTED} people. Text "family" to see them, or "unprotect" one first.`);
     }
     if (this.guardiansOf(them.hash).length >= MAX_GUARDIANS) return reply(`${theirMask} can't be added right now.`);
 
@@ -157,23 +157,23 @@ export class Family {
     this.data.inviteTimes[me.hash] = [...sent, this.now()];
     const delivered = await this.tell(
       them.hash,
-      `Phish Finder: someone at ${mask(me)} asked to get an alert when you're sent a dangerous link. ` +
-        "Reply YES to agree, or ignore this message. Nothing is shared unless you reply YES. " +
-        "They would see only the site's name and our report, never your messages.",
+      `Phish Finder: the person at ${mask(me)} asked to be told if you're ever sent a dangerous link. ` +
+        "Reply YES to allow this, or ignore this message and nothing will be shared. " +
+        "They would only see the website's name and our report, never your messages. Reply STOP any time.",
     );
     if (!delivered) {
       this.data.invites = this.data.invites.filter((i) => !same(i, pair)); // the hourly count still stands
       this.save();
-      return reply(`I couldn't reach ${theirMask}. Check the number and try again.`);
+      return reply(`I couldn't reach ${theirMask}. Please check the number and try again.`);
     }
     this.save();
     console.log(`family invite from ${label(me)} to ${label(them)}`);
-    return reply(`Invite sent to ${theirMask}. It's pending: nothing is linked until they reply YES, within 24 hours.`);
+    return reply(`I've asked ${theirMask}. Nothing happens unless they reply YES within 24 hours.`);
   }
 
   private async accept(me: Person, reply: Reply): Promise<void> {
     const pending = this.data.invites.filter((i) => i.protected === me.hash);
-    if (pending.length === 0) return reply("There's no request waiting for this number, so there's nothing to agree to.");
+    if (pending.length === 0) return reply("There's no request waiting for you, so there's nothing to say YES to.");
     this.remember(me); // from now on answer them where they wrote from
     const linked: string[] = [];
     for (const invite of pending) {
@@ -183,15 +183,15 @@ export class Family {
       linked.push(invite.guardian);
     }
     this.save();
-    if (linked.length === 0) return reply(`You already have ${MAX_GUARDIANS} people getting alerts, which is the most allowed.`);
+    if (linked.length === 0) return reply(`You already have ${MAX_GUARDIANS} people who are told about your links, which is the most I can add.`);
     for (const guardian of linked) {
       console.log(`family link: ${label(me)} agreed to ${label({ hash: guardian, last4: this.data.people[guardian]?.last4 ?? null })}`);
-      await this.tell(guardian, `Phish Finder: ${mask(me)} said YES. You'll get an alert if a link they forward is rated Dangerous.`);
+      await this.tell(guardian, `Phish Finder: ${mask(me)} said YES. You'll be told if a link they send me is dangerous.`);
     }
     const who = linked.map((g) => this.maskOf(g)).join(" and ");
     return reply(
-      `You're linked. ${who} will get an alert only when a link you forward is rated Dangerous: ` +
-        "the site's name and our report, nothing else. Text STOP any time to end it.",
+      `Done. ${who} will be told only when a link you send me is dangerous. ` +
+        "They'll see the website's name and our report, nothing else. Reply STOP any time to end this.",
     );
   }
 
@@ -206,8 +206,8 @@ export class Family {
       return reply("You have no family links, so there's nothing to stop.");
     }
     // Messages go out before the addresses are dropped by the save.
-    for (const link of asProtected) await this.tell(link.guardian, `Phish Finder: ${mask(me)} turned off alerts. You're no longer linked.`);
-    for (const link of asGuardian) await this.tell(link.protected, `Phish Finder: ${mask(me)} will no longer get alerts about your links.`);
+    for (const link of asProtected) await this.tell(link.guardian, `Phish Finder: ${mask(me)} turned off alerts. You won't be told about their links any more.`);
+    for (const link of asGuardian) await this.tell(link.protected, `Phish Finder: ${mask(me)} won't be told about your links any more.`);
     this.data.links = this.data.links.filter((l) => l.protected !== me.hash && l.guardian !== me.hash);
     this.data.invites = this.data.invites.filter((i) => i.protected !== me.hash && i.guardian !== me.hash);
     for (const pair of [...asProtected, ...declined]) {
@@ -215,7 +215,7 @@ export class Family {
     }
     this.save();
     console.log(`family stop from ${label(me)}`);
-    return reply("Done. Your family links are off: nobody gets alerts about your links, and you get none.");
+    return reply("Done. Nobody will be told about your links any more, and you won't get alerts about anyone else's.");
   }
 
   private async unprotect(me: Person, number: string, reply: Reply): Promise<void> {
@@ -223,13 +223,13 @@ export class Family {
     const pair = { guardian: me.hash, protected: them.hash };
     const linked = this.data.links.some((l) => same(l, pair));
     const invited = this.data.invites.some((i) => same(i, pair));
-    if (!linked && !invited) return reply(`You aren't getting alerts for ${mask(them)}.`);
-    if (linked) await this.tell(them.hash, `Phish Finder: ${mask(me)} will no longer get alerts about your links.`);
+    if (!linked && !invited) return reply(`You aren't told about ${mask(them)}'s links.`);
+    if (linked) await this.tell(them.hash, `Phish Finder: ${mask(me)} won't be told about your links any more.`);
     this.data.links = this.data.links.filter((l) => !same(l, pair));
     this.data.invites = this.data.invites.filter((i) => !same(i, pair));
     this.save();
     console.log(`family unlink by ${label(me)} of ${label(them)}`);
-    return reply(linked ? `Done. You'll no longer get alerts for ${mask(them)}.` : `Done. The invite to ${mask(them)} is cancelled.`);
+    return reply(linked ? `Done. You won't be told about ${mask(them)}'s links any more.` : `Done. I've cancelled the request to ${mask(them)}.`);
   }
 
   private summary(me: Person): string {
@@ -238,9 +238,9 @@ export class Family {
     const guardians = this.guardiansOf(me.hash).map((g) => this.maskOf(g));
     const waiting = this.data.invites.filter((i) => i.protected === me.hash).map((i) => this.maskOf(i.guardian));
     const lines: string[] = [];
-    if (protecting.length + pending.length > 0) lines.push(`You get alerts for: ${[...protecting, ...pending].join(", ")}`);
-    if (guardians.length > 0) lines.push(`Alerts about your links go to: ${guardians.join(", ")}`);
-    if (waiting.length > 0) lines.push(`Waiting for your YES: ${waiting.join(", ")}`);
+    if (protecting.length + pending.length > 0) lines.push(`You're told about links sent to: ${[...protecting, ...pending].join(", ")}`);
+    if (guardians.length > 0) lines.push(`These people are told if you're sent a dangerous link: ${guardians.join(", ")}`);
+    if (waiting.length > 0) lines.push(`These people are waiting for your YES: ${waiting.join(", ")}`);
     if (lines.length === 0) return `You have no family links. ${USAGE}`;
     return [...lines, "Text STOP to end them all."].join("\n");
   }

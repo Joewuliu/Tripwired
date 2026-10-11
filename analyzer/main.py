@@ -16,6 +16,7 @@ from env import load_root_env
 from events import Sender, bus, sender_from
 from explain import explain
 from pipeline import scan
+from plain import plain_line, plain_lines
 from public_check import RateLimiter, normalize
 from reports import load_report, save_report
 from score import judge
@@ -64,17 +65,23 @@ def _brand_match(brand_findings: list[dict]) -> BrandMatch | None:
 async def _wording(judgement) -> tuple[str, list[str], str]:
     """The headline and lines to show. Gemini may reword them; it cannot touch the verdict, the score
     or the evidence, and anything it gets wrong leaves the template wording as it was."""
+    plain = plain_lines(judgement.evidence)  # the same findings, in everyday words
+    label = {"dangerous": "Dangerous", "suspicious": "Suspicious"}.get(judgement.verdict)
     explained = await explain(judgement.verdict, judgement.evidence)
     if explained is None:
-        return judgement.headline, judgement.observations, "template"
-    if judgement.verdict in ("dangerous", "suspicious"):
-        label = "Dangerous" if judgement.verdict == "dangerous" else "Suspicious"
+        if label:  # the top finding, plain, behind the verdict word
+            top = next((plain_line(e) for e in judgement.evidence if e.points > 0 and plain_line(e)), None)
+            headline = f"{label}: {top}" if top else judgement.headline
+        else:
+            headline = judgement.headline
+        return headline, plain or judgement.observations, "template"
+    if label:
         return f"{label}: {explained.headline}", explained.lines, "gemini"
     # The fixed headline of the clean and couldn't-check verdicts stays ours. A couldn't-check always
     # leads with its reason, as the scorer ordered it.
     lines = explained.lines
     if judgement.verdict == "couldnt_check" and judgement.evidence:
-        reason = judgement.evidence[0].label
+        reason = plain_line(judgement.evidence[0]) or judgement.evidence[0].label
         lines = [reason, *[line for line in lines if line != reason][:2]]
     return judgement.headline, lines, "gemini"
 
@@ -147,6 +154,14 @@ def _visitor(request: Request) -> str:
     forwarded = request.headers.get("x-forwarded-for", "")
     last = forwarded.split(",")[-1].strip()
     return last or (request.client.host if request.client else "unknown")
+
+
+@app.post("/internal/reset-limits", status_code=204)
+async def reset_limits() -> None:
+    """Internal (private network only; Caddy answers 404): forget the website box's per-visitor counts,
+    for a demo that has used them up. Nothing else is touched: reports, events and scans stay."""
+    global _public_limit
+    _public_limit = RateLimiter()
 
 
 @app.post("/api/check", response_model=CheckResponse)

@@ -255,7 +255,7 @@ test("the eleventh check in an hour gets the friendly reply and no scan", async 
   await handleInbound({ kind: "text", text: "https://example.com" }, out, analyzer, undefined, policy);
   assert.equal(analyzer.asked.length, 10); // nothing more was scanned
   assert.equal(sent.length, 1);
-  assert.match(sent[0], /^text:You.ve used your 10 checks for this hour./);
+  assert.match(sent[0], /^text:You've used all 10 checks for this hour./);
   assert.match(sent[0], /about \d+ minutes?/);
   assert.ok(!/safe/i.test(sent[0].replace("Phish Finder", "")));
 });
@@ -269,7 +269,7 @@ test("pictures count too, and so does the second sender separately", async () =>
   await handleInbound({ kind: "image", pictures: [pic] }, recorder().out, analyzer, undefined, mine);
   const { out, sent } = recorder();
   await handleInbound({ kind: "image", pictures: [pic] }, out, analyzer, undefined, mine);
-  assert.match(sent[0], /used your 1 checks/);
+  assert.match(sent[0], /used all 1 checks/);
   const second = recorder();
   await handleInbound({ kind: "image", pictures: [pic] }, second.out, analyzer, undefined, other);
   assert.equal(second.sent[0], `text:${READING_PICTURE}`);
@@ -349,4 +349,93 @@ test("a limited message produces no scan and no reply event", async () => {
   await handleInbound({ kind: "text", text: "https://b.example" }, recorder().out, analyzer, undefined, policy);
   assert.equal(analyzer.asked.length, 1);
   assert.equal(analyzer.replies.length, 1);
+});
+
+// --- Instant feedback: a tapback and the typing indicator ---------------------------------------
+
+function signalling(extra: Partial<Outbox> = {}) {
+  const events: string[] = [];
+  const out: Outbox = {
+    sendText: async (text) => void events.push(`text:${text.slice(0, 22)}`),
+    sendImage: async () => void events.push("image"),
+    acknowledge: () => void events.push("tapback"),
+    typing: (on) => void events.push(on ? "typing on" : "typing off"),
+    ...extra,
+  };
+  return { out, events };
+}
+
+test("a link gets the tapback first, typing while the scan runs, and typing is off before the verdict", async () => {
+  const { out, events } = signalling();
+  await handleInbound({ kind: "text", text: "https://example.com" }, out, fakeAnalyzer());
+  assert.equal(events[0], "tapback");
+  const verdict = events.findIndex((e) => e.startsWith("text:Phish Finder:"));
+  const lastOff = events.lastIndexOf("typing off");
+  assert.ok(events.indexOf("typing on") > 0 && lastOff > events.indexOf("typing on") && lastOff < verdict, events.join(" | "));
+  assert.deepEqual(events.filter((e) => e === "tapback").length, 1);
+});
+
+test("typing is switched off even when the analyzer fails", async () => {
+  const { out, events } = signalling();
+  const analyzer = fakeAnalyzer({
+    analyze: async () => {
+      throw new AnalyzerUnreachable("http://127.0.0.1:8001", "unreachable");
+    },
+  });
+  await handleInbound({ kind: "text", text: "https://example.com" }, out, analyzer);
+  assert.ok(events.lastIndexOf("typing off") > events.lastIndexOf("typing on"));
+});
+
+test("a picture is acknowledged once, with typing while it is read and while the link is scanned", async () => {
+  const { out, events } = signalling();
+  const analyzer = fakeAnalyzer({ readImage: async () => ({ status: "ok", urls: ["https://usps-track.top/x"] }) });
+  await handleInbound({ kind: "image", pictures: [picture()] }, out, analyzer);
+  assert.equal(events.filter((e) => e === "tapback").length, 1);
+  assert.ok(events.filter((e) => e === "typing off").length >= 2);
+  assert.equal(events.at(-1)!.startsWith("text:Phish Finder:"), true);
+});
+
+test("a limited message, a command and a how-to reply get no tapback and no typing", async () => {
+  const { out, events } = signalling();
+  const limiter = new RateLimiter(1);
+  const policy = policyFor(NUMBER, limiter);
+  const analyzer = fakeAnalyzer();
+  await handleInbound({ kind: "text", text: "https://a.example" }, signalling().out, analyzer, undefined, policy);
+  await handleInbound({ kind: "text", text: "https://b.example" }, out, analyzer, undefined, policy); // limited
+  await handleInbound({ kind: "text", text: "hello?" }, out, analyzer, undefined, policy); // how-to
+  assert.deepEqual(events.filter((e) => e === "tapback" || e.startsWith("typing")), []);
+});
+
+test("a tapback or typing indicator that throws never stops the reply", async () => {
+  const { out, events } = signalling({
+    acknowledge: () => {
+      throw new Error("reactions are not supported");
+    },
+    typing: () => {
+      throw new Error("typing failed");
+    },
+  });
+  const lines: string[] = [];
+  const original = console.error;
+  console.error = (...a: unknown[]) => void lines.push(a.map(String).join(" "));
+  try {
+    await handleInbound({ kind: "text", text: "https://example.com" }, out, fakeAnalyzer());
+  } finally {
+    console.error = original;
+  }
+  assert.ok(events.some((e) => e.startsWith("text:Phish Finder:")), "the verdict still went out");
+  assert.ok(events.includes("image"), "and so did the screenshot");
+});
+
+test("a platform with neither signal works as before", async () => {
+  const { out, sent } = recorder();
+  assert.equal(out.acknowledge, undefined);
+  await handleInbound({ kind: "text", text: "https://example.com" }, out, fakeAnalyzer());
+  assert.equal(sent.length, 3);
+});
+
+test("the signals are not waited for: a tapback that never settles does not hold the reply", async () => {
+  const { out, events } = signalling({ acknowledge: () => void new Promise(() => {}) });
+  await handleInbound({ kind: "text", text: "https://example.com" }, out, fakeAnalyzer());
+  assert.ok(events.some((e) => e.startsWith("text:Phish Finder:")));
 });

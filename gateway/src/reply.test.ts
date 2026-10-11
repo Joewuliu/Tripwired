@@ -6,8 +6,12 @@ function result(overrides: Partial<AnalysisResult> = {}): AnalysisResult {
   return {
     id: "abc123abc123",
     verdict: "dangerous",
-    headline: "Dangerous: Listed as phishing by OpenPhish",
-    observations: ["Listed as phishing by OpenPhish", "Registered 2 days ago, from RDAP", "Asks for a password"],
+    headline: "Dangerous: Security services have already reported this link as a scam.",
+    observations: [
+      "Security services have already reported this link as a scam.",
+      "This website was only created 2 days ago.",
+      "The page asks for a password.",
+    ],
     url_defanged: "hxxps://short[.]example/x",
     final_url_defanged: "hxxps://ezpass-pay[.]top/pay",
     loaded: true,
@@ -26,31 +30,53 @@ test("defangText leaves ordinary sentences and already-defanged links alone", ()
   assert.equal(defangText("hxxps://ezpass-pay[.]top/pay"), "hxxps://ezpass-pay[.]top/pay");
 });
 
-test("a dangerous reply has a label, headline, up to three bullets, an action and the link", () => {
+test("a dangerous reply: the label, what to do, why in plain words, then the link", () => {
   const reply = formatReply(result());
-  const lines = reply.split("\n");
-  assert.equal(lines[0], "Phish Finder: DANGEROUS");
-  assert.equal(lines[1], "Dangerous: Listed as phishing by OpenPhish");
-  assert.ok(!reply.includes("- Listed as phishing by OpenPhish"), "headline's reason is not repeated");
-  assert.ok(reply.includes("- Registered 2 days ago, from RDAP"));
-  assert.ok(reply.includes("Don't enter anything, and don't tap the link."));
-  assert.equal(lines.at(-1), "Link opened: hxxps://ezpass-pay[.]top/pay");
+  assert.deepEqual(reply.split("\n"), [
+    "Phish Finder: DANGEROUS",
+    "This looks like a scam. Don't tap the link, and don't type anything into it.",
+    "Why:",
+    "- Security services have already reported this link as a scam.",
+    "- This website was only created 2 days ago.",
+    "- The page asks for a password.",
+    "The link, made unclickable on purpose: hxxps://ezpass-pay[.]top/pay",
+  ]);
 });
 
-test("at most three observations are shown", () => {
-  const many = Array.from({ length: 6 }, (_, i) => `Observation number ${i}`);
+test("the top reason is said once, not twice", () => {
+  const reply = formatReply(result());
+  assert.equal(reply.split("Security services have already reported").length - 1, 1);
+});
+
+test("at most three reasons are shown", () => {
+  const many = Array.from({ length: 6 }, (_, i) => `Reason number ${i}.`);
   const bullets = formatReply(result({ headline: "Suspicious: x", verdict: "suspicious", observations: many }))
     .split("\n")
     .filter((line) => line.startsWith("- "));
-  assert.equal(bullets.length, 3);
+  assert.deepEqual(bullets, ["- x", "- Reason number 0.", "- Reason number 1."]);
 });
 
-test("a link that did not load says 'Link we tried' and shows the original address", () => {
+test("a couldn't-check reply leads with its reason, then says what to do, and names the link it tried", () => {
   const reply = formatReply(
-    result({ verdict: "couldnt_check", loaded: false, final_url_defanged: null, observations: [] }),
+    result({
+      verdict: "couldnt_check",
+      loaded: false,
+      final_url_defanged: null,
+      headline: "Couldn't get a proper look at this link. Don't enter anything until you verify it another way.",
+      observations: ["That web address doesn't exist, or no longer works.", "This website was created 30 years ago."],
+    }),
   );
-  assert.ok(reply.includes("Phish Finder: COULDN'T CHECK"));
-  assert.ok(reply.endsWith("Link we tried: hxxps://short[.]example/x"));
+  assert.deepEqual(reply.split("\n"), [
+    "Phish Finder: COULDN'T CHECK",
+    "That web address doesn't exist, or no longer works.",
+    "That doesn't mean it's fine. Don't type anything into it, and call the company on a number you already trust.",
+    "The link, made unclickable on purpose: hxxps://short[.]example/x",
+  ]);
+});
+
+test("a couldn't-check with no reason from the analyzer still gives one", () => {
+  const reply = formatReply(result({ verdict: "couldnt_check", observations: [], loaded: false }));
+  assert.equal(reply.split("\n")[1], "I couldn't get a proper look at that link.");
 });
 
 test("an unknown verdict is treated as could not check, never as clear", () => {
@@ -65,23 +91,27 @@ test("an unknown verdict is treated as could not check, never as clear", () => {
 const REAL: Record<string, Partial<AnalysisResult>> = {
   dangerous: {
     verdict: "dangerous",
-    headline: "Dangerous: Listed as phishing by OpenPhish",
-    observations: ["Listed as phishing by OpenPhish", "Registered 2 days ago, from RDAP", "Page asks for card details (page scan)"],
+    headline: "Dangerous: Security services have already reported this link as a scam.",
+    observations: [
+      "Security services have already reported this link as a scam.",
+      "This website was only created 2 days ago.",
+      "The page asks for card details.",
+    ],
   },
   suspicious: {
     verdict: "suspicious",
-    headline: "Suspicious: Web address uses the name Chase but is not an official site (brand list)",
-    observations: ["Web address uses the name Chase but is not an official site (brand list)", "Not listed by Google Safe Browsing, URLhaus or OpenPhish"],
+    headline: "Suspicious: The web address uses the name Chase, but it isn't their real website.",
+    observations: ["The web address uses the name Chase, but it isn't their real website.", "It isn't on any list of known scam websites."],
   },
   no_red_flags: {
     verdict: "no_red_flags",
     headline: "No red flags found. That is not a guarantee.",
-    observations: ["Registered domain is official for Chase (brand list)", "Not listed by Google Safe Browsing, URLhaus or OpenPhish"],
+    observations: ["This is the official website of Chase.", "It isn't on any list of known scam websites."],
   },
   couldnt_check: {
     verdict: "couldnt_check",
     headline: "Couldn't get a proper look at this link. Don't enter anything until you verify it another way.",
-    observations: ["The site refused the sandbox's phone browser (HTTP 403)"],
+    observations: ["The website blocked my check."],
     loaded: true,
   },
 };
@@ -104,16 +134,17 @@ for (const [verdict, fields] of Object.entries(REAL)) {
   });
 }
 
-test("a page we could not inspect shows why, and which link was tried rather than 'opened'", () => {
+test("a page we could not inspect shows why first, and the link that was tried rather than where it ended", () => {
   const reply = formatReply(result(REAL.couldnt_check));
-  assert.ok(reply.includes("- The site refused the sandbox's phone browser (HTTP 403)"));
-  assert.ok(reply.endsWith("Link we tried: hxxps://short[.]example/x"));
+  assert.equal(reply.split("\n")[1], "The website blocked my check.");
+  assert.ok(reply.endsWith("made unclickable on purpose: hxxps://short[.]example/x"));
 });
 
-test("a clean reply is not a green light: it carries the caveat and the official-site advice", () => {
+test("a clean reply is not a green light: it admits it cannot promise, and points to the official site", () => {
   const reply = formatReply(result(REAL.no_red_flags));
-  assert.ok(reply.includes("That is not a guarantee."));
-  assert.ok(reply.includes("go to the official site yourself"));
+  assert.ok(reply.includes("I didn't find anything wrong, but I can't promise."));
+  assert.ok(reply.includes("go to the company's own website yourself"));
+  assert.ok(reply.includes("What I found:"));
 });
 
 const HOST = "https://34-123-45-67.sslip.io";

@@ -1,35 +1,36 @@
 import * as linkify from "linkifyjs";
 
-export const OPENING = "Opening that in a sandbox. About 20 seconds.";
+// Everything here is written for someone who is not technical: short sentences, everyday words.
+export const OPENING = "Checking that link for you. This takes about 20 seconds.";
 export const NO_URL =
-  "Forward me a suspicious text or link and I'll open it in a sandbox for you. " +
-  "To get an alert when someone you care about is sent a dangerous link, text: protect and their mobile number.";
-export const PICTURE_UNAVAILABLE = "I can't read pictures right now. Paste the link itself and I'll check it.";
-export const READING_PICTURE = "Looking for a link in your picture. A few seconds.";
+  "Send me a text or link you're not sure about, and I'll check it for you. " +
+  "To be told when someone you care about is sent a dangerous link, text: protect and their mobile number.";
+export const PICTURE_UNAVAILABLE =
+  "I can't look at pictures right now. Please type or paste the link itself and I'll check it.";
+export const READING_PICTURE = "Looking for a link in your picture. One moment.";
 export const NO_LINK_IN_PICTURE =
-  "I couldn't find a link in that picture. If it's a QR code, try a closer, steadier photo, or paste the link itself.";
-export const ONE_AT_A_TIME = "I check one link at a time, so I opened the first one.";
+  "I couldn't find a link in that picture. If it's a QR code, try a closer, steadier photo. Or type the link in a message.";
+export const ONE_AT_A_TIME = "I can only check one link at a time, so I checked the first one.";
 export const ANALYZER_DOWN =
-  "I couldn't check that right now. Don't tap the link until you can verify it another way.";
+  "I can't check links right now. Please don't tap that link. Try me again in a few minutes.";
 
 /** The friendly "slow down" reply: how many checks, and roughly when the next one is free. */
 export function rateLimited(limit: number, waitMs: number): string {
   const minutes = Math.max(1, Math.ceil(waitMs / 60_000));
   return (
-    `You've used your ${limit} checks for this hour. I can check another link in about ` +
-    `${minutes} minute${minutes === 1 ? "" : "s"}. The limit keeps Phish Finder available for everyone. ` +
-    "Until then, don't tap the link or enter anything on it."
+    `You've used all ${limit} checks for this hour. I can check another one in about ` +
+    `${minutes} minute${minutes === 1 ? "" : "s"}. ` +
+    "Until then, please don't tap that link or type anything into it."
   );
 }
 
 /** Said before the scan of a link that was read from a picture, so a misread is visible. */
 export function foundInPicture(url: string): string {
-  return `I found this link in your picture: ${defangText(url)}\nOpening it in a sandbox. About 20 seconds.`;
+  return `I found this link in your picture: ${defangText(url)}\nChecking it now. This takes about 20 seconds.`;
 }
 
-const COULDNT_CHECK_HEADLINE =
-  "Couldn't get a proper look at this link. Don't enter anything until you verify it another way.";
-const MAX_OBSERVATIONS = 3;
+const NO_REASON = "I couldn't get a proper look at that link.";
+const MAX_REASONS = 3;
 
 /** What the analyzer sends back for one scan (the fields the reply uses). */
 export interface AnalysisResult {
@@ -43,7 +44,7 @@ export interface AnalysisResult {
   screenshot_url: string | null;
 }
 
-/** The four things Tripwire ever says. There is no "safe". */
+/** The four things Phish Finder ever says. There is no "safe". */
 type Verdict = "dangerous" | "suspicious" | "no_red_flags" | "couldnt_check";
 
 const LABELS: Record<Verdict, string> = {
@@ -53,11 +54,15 @@ const LABELS: Record<Verdict, string> = {
   couldnt_check: "COULDN'T CHECK",
 };
 
+/** What to do, in one or two plain sentences. */
 const ACTIONS: Record<Verdict, string> = {
-  dangerous: "Don't enter anything, and don't tap the link.",
-  suspicious: "Be careful. Don't enter passwords or payment details until you verify it another way.",
-  no_red_flags: "If it asks for a login or payment, go to the official site yourself instead.",
-  couldnt_check: "Contact the sender or company through a phone number or site you already trust.",
+  dangerous: "This looks like a scam. Don't tap the link, and don't type anything into it.",
+  suspicious:
+    "Be careful with this one. Don't type a password or card number into it, and check with the sender another way first.",
+  no_red_flags:
+    "I didn't find anything wrong, but I can't promise. If it asks for a password or payment, go to the company's own website yourself instead.",
+  couldnt_check:
+    "That doesn't mean it's fine. Don't type anything into it, and call the company on a number you already trust.",
 };
 
 function isVerdict(value: string): value is Verdict {
@@ -103,21 +108,26 @@ export function reportLink(publicUrl: string | undefined, id: string): string | 
 export function formatReply(result: AnalysisResult, publicUrl?: string): string {
   const known = isVerdict(result.verdict);
   const verdict: Verdict = known ? (result.verdict as Verdict) : "couldnt_check";
-  const headline = known ? result.headline : COULDNT_CHECK_HEADLINE;
-  // Dangerous and suspicious headlines already lead with the top observation.
-  const bullets = result.observations
-    .filter((observation) => !headline.endsWith(observation))
-    .slice(0, MAX_OBSERVATIONS)
-    .map((observation) => `- ${observation}`);
+  const observations = result.observations.map((line) => line.trim()).filter(Boolean);
+  const lines = [`Phish Finder: ${LABELS[verdict]}`];
+
+  if (verdict === "couldnt_check") {
+    // The reason comes first: it is the whole point of this message. The analyzer puts it first.
+    lines.push(known && observations.length > 0 ? observations[0] : NO_REASON, ACTIONS[verdict]);
+  } else {
+    // Dangerous and suspicious headlines carry the top reason behind the verdict word: use it first.
+    const lead = result.headline.replace(/^(Dangerous|Suspicious):\s*/i, "").trim();
+    const reasons = [...new Set([...(verdict === "no_red_flags" ? [] : [lead]), ...observations])]
+      .filter(Boolean)
+      .slice(0, MAX_REASONS);
+    lines.push(ACTIONS[verdict]);
+    if (reasons.length > 0) {
+      lines.push(verdict === "no_red_flags" ? "What I found:" : "Why:", ...reasons.map((reason) => `- ${reason}`));
+    }
+  }
   const opened = verdict !== "couldnt_check" && result.loaded;
   const link = opened ? result.final_url_defanged : result.url_defanged;
-  const lines = [
-    `Phish Finder: ${LABELS[verdict]}`,
-    headline,
-    ...bullets,
-    ACTIONS[verdict],
-    `${opened ? "Link opened" : "Link we tried"}: ${link ?? result.url_defanged}`,
-  ];
+  lines.push(`The link, made unclickable on purpose: ${link ?? result.url_defanged}`);
   const message = defangText(lines.join("\n"));
   const report = reportLink(publicUrl, result.id);
   return report ? `${message}\n\nFull report: ${report}` : message;

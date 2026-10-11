@@ -31,6 +31,11 @@ def client(monkeypatch, tmp_path):
     return TestClient(main.app)
 
 
+def labels(body: dict) -> list[str]:
+    """The evidence sentences (precise, with their sources). The short plain lines are `observations`."""
+    return [e["label"] for e in body["evidence"]]
+
+
 def fake_world(monkeypatch, feeds=None, age=None, **page):
     """A fake page, fake feeds and fake RDAP behind the real pipeline."""
 
@@ -60,7 +65,11 @@ def test_analyze_returns_defanged_result_and_a_fetchable_screenshot(client, monk
 
     AnalysisResult.model_validate(body)  # the response is exactly the shared contract
     assert body["verdict"] == "suspicious" and body["score"] == 30  # a two-day-old domain, nothing else
-    assert body["headline"] == "Suspicious: Registered 2 days ago, from RDAP"
+    assert body["headline"] == "Suspicious: This website was only created 2 days ago."
+    assert labels(body)[0] == "Registered 2 days ago, from RDAP"  # the evidence keeps its source
+    assert body["observations"] == [
+        "This website was only created 2 days ago.", "It isn't on any list of known scam websites.", "The page mentions PayPal.",
+    ]
     assert [(e["id"], e["points"], e["source"]) for e in body["evidence"]] == [
         ("domain_under_7_days", 30, "RDAP"),
         ("feeds_clear", 0, "Google Safe Browsing, URLhaus, OpenPhish"),
@@ -136,7 +145,7 @@ def test_the_private_address_refusal_is_kept_too(client, monkeypatch):
 
 def test_observations_say_what_the_feeds_and_rdap_found(client, monkeypatch):
     fake_world(monkeypatch)
-    lines = client.post("/analyze", json={"urls": ["https://short.example/x"]}).json()["observations"]
+    lines = labels(client.post("/analyze", json={"urls": ["https://short.example/x"]}).json())
     assert "Not listed by Google Safe Browsing, URLhaus or OpenPhish" in lines
     assert "Registered 2 days ago, from RDAP" in lines
 
@@ -147,7 +156,8 @@ def test_brand_findings_appear_in_the_observations_defanged(client, monkeypatch)
         redirects=[{"status": 200, "url": "https://paypa1.com/login"}],
     )
     body = client.post("/analyze", json={"urls": ["https://paypa1.com/login"]}).json()
-    assert "Domain imitates PayPal: paypa1[.]com spells \"paypal\" with look-alike characters (look-alike check)" in body["observations"]
+    assert "Domain imitates PayPal: paypa1[.]com spells \"paypal\" with look-alike characters (look-alike check)" in labels(body)
+    assert "The web address is spelled to look like PayPal's, but it isn't." in body["observations"]
     assert body["brand_match"] == {
         "brand": "PayPal", "official_domain_defanged": "paypal[.]com", "real_screenshot_url": None, "similarity": None,
     }
@@ -162,8 +172,9 @@ def test_an_official_page_is_reported_as_official_and_not_flagged(client, monkey
     body = client.post("/analyze", json={"urls": ["https://www.chase.com/"]}).json()
     assert body["verdict"] == "no_red_flags" and body["score"] == 0
     assert body["headline"] == "No red flags found. That is not a guarantee."
-    assert "Registered domain is official for Chase (brand list)" in body["observations"]
-    assert not any("imitates" in line or "not an official site" in line for line in body["observations"])
+    assert "Registered domain is official for Chase (brand list)" in labels(body)
+    assert "This is the official website of Chase." in body["observations"]
+    assert not any("imitates" in line or "not an official site" in line for line in labels(body))
 
 
 def test_a_clean_page_is_no_red_flags_and_never_called_safe(client, monkeypatch):
@@ -178,7 +189,8 @@ def test_a_listed_page_is_dangerous_whatever_else_is_true(client, monkeypatch):
     fake_world(monkeypatch, feeds=hit, age=OLD, title="A shop", text="Welcome")
     body = client.post("/analyze", json={"urls": ["https://short.example/x"]}).json()
     assert (body["verdict"], body["score"]) == ("dangerous", 60)
-    assert body["headline"] == "Dangerous: Listed as phishing by OpenPhish"
+    assert body["headline"] == "Dangerous: Security services have already reported this link as a scam."
+    assert labels(body)[0] == "Listed as phishing by OpenPhish"
 
 
 @pytest.mark.parametrize("overrides", [
@@ -198,7 +210,7 @@ def test_a_listing_is_reported_by_name(client, monkeypatch):
     hit = [{"source": "OpenPhish", "status": "hit", "url": "https://evil-login.example.com/signin",
             "kind": "phishing", "detail": "exact URL is on the list"}]
     fake_world(monkeypatch, feeds=hit)
-    lines = client.post("/analyze", json={"urls": ["https://short.example/x"]}).json()["observations"]
+    lines = labels(client.post("/analyze", json={"urls": ["https://short.example/x"]}).json())
     assert "Listed as phishing by OpenPhish" in lines
 
 
@@ -209,7 +221,7 @@ def test_a_missing_key_is_shown_as_not_checked(client, monkeypatch):
         {"source": "OpenPhish", "status": "clear"},
     ]
     fake_world(monkeypatch, feeds=feeds)
-    lines = client.post("/analyze", json={"urls": ["https://short.example/x"]}).json()["observations"]
+    lines = labels(client.post("/analyze", json={"urls": ["https://short.example/x"]}).json())
     assert "Google Safe Browsing was not checked (no API key is set)" in lines
     assert "URLhaus was not checked (no API key is set)" in lines
     assert "Not listed by OpenPhish" in lines
@@ -223,8 +235,10 @@ def test_a_page_that_did_not_load_is_couldnt_check_but_feeds_and_age_still_repor
     body = client.post("/analyze", json={"urls": ["https://gone.example/"]}).json()
     assert body["verdict"] == "couldnt_check"
     assert body["screenshot_url"] is None
-    assert body["observations"][0] == "The address does not resolve (DNS lookup)"
-    assert "Registered 30 years ago, from RDAP" in body["observations"]
+    assert labels(body)[0] == "The address does not resolve (DNS lookup)"
+    assert body["observations"][0] == "That web address doesn't exist, or no longer works."  # the reason leads, plainly
+    assert "This website was created 30 years ago." in body["observations"]
+    assert "Registered 30 years ago, from RDAP" in labels(body)
     assert "https://" not in str(body) and "ERR_NAME" not in str(body)  # no raw browser error reaches a user
 
 
@@ -234,15 +248,18 @@ def test_what_the_page_asks_for_and_how_it_answered_are_reported(client, monkeyp
         sensitive_fields=[{"kind": "password", "type": "password", "name": "pw", "id": ""},
                           {"kind": "card", "type": "text", "name": "cc", "id": ""}],
     )
-    lines = client.post("/analyze", json={"urls": ["https://short.example/x"]}).json()["observations"]
-    assert "Page asks for a password and card details (page scan)" in lines
-    assert "The site refused the sandbox's phone browser (HTTP 403)" in lines
+    body = client.post("/analyze", json={"urls": ["https://short.example/x"]}).json()
+    assert "Page asks for a password and card details (page scan)" in labels(body)
+    assert "The site refused the sandbox's phone browser (HTTP 403)" in labels(body)
+    assert "The page asks for a password and card details." in body["observations"]
+    assert "The website blocked my check." in body["observations"]
 
 
 def test_a_hosts_own_warning_page_is_reported(client, monkeypatch):
     fake_world(monkeypatch, title="Suspected phishing site | Cloudflare", text="This website has been reported")
     body = client.post("/analyze", json={"urls": ["https://short.example/x"]}).json()
-    assert "The hosting provider has already flagged this page as dangerous (Cloudflare phishing warning)" in body["observations"]
+    assert "The hosting provider has already flagged this page as dangerous (Cloudflare phishing warning)" in labels(body)
+    assert body["observations"][0] == "The website's own host has already warned that this page is dangerous."
     assert body["verdict"] == "dangerous"
 
 
@@ -255,7 +272,8 @@ def test_private_address_is_refused_without_launching_a_browser(client, monkeypa
     assert body["verdict"] == "couldnt_check"
     assert body["loaded"] is False
     assert body["screenshot_url"] is None
-    assert body["observations"][0] == "Not a public web address, so it was not opened"
+    assert labels(body)[0] == "Not a public web address, so it was not opened"
+    assert body["observations"][0] == "That isn't an ordinary public web address, so I didn't open it."
 
 
 @pytest.mark.parametrize("payload", [{}, {"urls": []}, {"urls": [""]}, {"urls": ["x" * 3000]}, {"urls": "https://a.test"}])

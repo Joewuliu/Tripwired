@@ -532,6 +532,42 @@ docker compose logs gateway --since 1h | grep family       # hash + •••-la
 
 The dashboard's Report Summary shows `Guardian •••-4412 alerted` when an alert goes out.
 
+## Demo day
+
+**The line's name and photo.** The Photon SDK can only share the line's existing contact card
+(name and photo) with a chat; it cannot set them. Set them in the Photon dashboard, on the project's
+iMessage line: name `Phish Finder`, photo `deploy/profile-photo.png` (1024 x 1024, the logo on the
+sky colours). A phone shows them once the person accepts "Share Name and Photo"; the project's
+`imessageSynced` profile setting in the same dashboard makes the line offer its card by itself the
+first time it talks to someone. Until that is set the line shows as a bare number.
+
+**Instant feedback.** The moment a link or picture is accepted for checking, the message gets a
+question-mark tapback ("looking into it", never a thumbs-up on a scam), and the typing indicator
+shows while the check runs. Both are best effort: if the platform refuses either, one line is
+logged (`tapback not shown` / `typing indicator not shown`) and the reply goes out as normal.
+
+**Health check.** Before going on stage:
+
+```bash
+cd ~/tripwire && sudo bash deploy/health.sh
+```
+
+It prints one `OK` or `FAIL` line each for the three containers, `/events`, a scan of example.com
+through the public address (verdict, screenshot and report page), the Gemini key, the firewall rules
+and a probe that the analyzer cannot reach the metadata server. It exits non-zero if anything failed.
+The scan counts as one of the website box's ten checks an hour.
+
+**Reset between demos.**
+
+```bash
+bash deploy/demo-reset.sh        # asks first; -y skips the question
+```
+
+Clears family links, pending invites and cooldowns, the iMessage rate-limit counts (the gateway
+restarts for a few seconds) and the website box's counts. Reports, screenshots and the dashboard are
+untouched; a browser's hidden scans are remembered by that browser, so use a private window or clear
+the site's data there if you want them back.
+
 ## Updating
 
 After you commit and push from the laptop (Option A), or repeat the Option B copy:

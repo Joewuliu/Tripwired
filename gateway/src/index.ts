@@ -1,4 +1,4 @@
-import { type Space, Spectrum, attachment } from "spectrum-ts";
+import { Spectrum, attachment } from "spectrum-ts";
 import { imessage } from "spectrum-ts/providers/imessage";
 import { terminal } from "spectrum-ts/providers/terminal";
 import { resolve } from "node:path";
@@ -6,8 +6,9 @@ import { createSeenSet } from "./dedupe";
 import { loadRootEnv } from "./env";
 import { Family } from "./family";
 import { fileAt } from "./familyStore";
-import { type FamilyContext, type Outbox, type Policy, handleInbound } from "./handler";
+import { type FamilyContext, type Policy, handleInbound } from "./handler";
 import { toInbound } from "./inbound";
+import { createOutbox } from "./outbox";
 import { RateLimiter, limitFromEnv } from "./limiter";
 import { chooseProviders } from "./providers";
 import { createHasher, label, redact } from "./sender";
@@ -15,13 +16,6 @@ import { createHasher, label, redact } from "./sender";
 /** Family links live on the gateway's own data volume (TRIPWIRE_DATA_DIR, default gateway/data). */
 function familyPath(): string {
   return resolve(process.env.TRIPWIRE_DATA_DIR || resolve(import.meta.dirname, "../data"), "family.json");
-}
-
-function outboxFor(space: Space): Outbox {
-  return {
-    sendText: async (text) => void (await space.send(text)),
-    sendImage: async (bytes, name, mimeType) => void (await space.send(attachment(bytes, { name, mimeType }))),
-  };
 }
 
 async function main(): Promise<void> {
@@ -72,7 +66,7 @@ async function main(): Promise<void> {
       family && address ? { service: family, me: { ...sender, address } } : undefined;
     const policy: Policy = { sender, label: label(sender), limit: limiter.limit, take: () => limiter.take(sender.hash) };
     // Not awaited: one slow scan must not hold up the next message.
-    handleInbound(toInbound(message.content), outboxFor(space), undefined, undefined, policy, familyContext).catch((error) =>
+    handleInbound(toInbound(message.content), createOutbox(space, message, (bytes, name, mimeType) => attachment(bytes, { name, mimeType })), undefined, undefined, policy, familyContext).catch((error) =>
       console.error("message failed:", redact(error instanceof Error ? error.message : String(error))),
     );
   }
