@@ -504,6 +504,34 @@ rehearsing or if the venue's network fails; add `&speed=2` to play it faster, `&
 once. A viewer who has asked their system for reduced motion gets the same information with
 nothing moving or flashing.
 
+## Family mode
+
+A guardian texts the line `protect +1 919 555 0142`. Tripwire texts that number an invite naming
+the guardian only as `•••-<last four>`; nothing is linked until that person replies `YES` (within
+24 hours). From then on, when the protected person forwards a link and the verdict is Dangerous,
+and only then, each guardian gets one short alert: the site's name (defanged), our report link, and
+that the person was warned. Never the person's messages and never another verdict.
+
+- `STOP` from either person ends every link they are in, at once, and tells the other side.
+  `unprotect <number>` from the guardian ends that one. `family` lists your links, masked.
+- Limits: 3 invites an hour and 5 protected people per guardian; 3 guardians per person. After an
+  ignored invite or a STOP, that guardian cannot invite that number again for 24 hours.
+- The person must text from the same mobile number the guardian typed (not an email iMessage
+  address), or their YES cannot be matched to the invite.
+
+Links are kept in `family.json` on the `gateway_data` volume. It is the one place a phone number
+is stored (an alert cannot be sent without it), only for people in a link or a pending invite, and
+it is removed when the last of those ends. Logs, events, reports and the web pages see the hash and
+the last four digits only. To look at it or wipe it:
+
+```bash
+docker compose exec gateway cat /app/data/family.json      # contains phone numbers: do not paste it anywhere
+docker compose exec gateway rm /app/data/family.json && docker compose restart gateway   # forget every link
+docker compose logs gateway --since 1h | grep family       # hash + •••-last4, never a number
+```
+
+The dashboard's Report Summary shows `Guardian •••-4412 alerted` when an alert goes out.
+
 ## Updating
 
 After you commit and push from the laptop (Option A), or repeat the Option B copy:

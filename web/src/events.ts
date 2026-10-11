@@ -2,7 +2,9 @@
 // dashboard can be designed with no scan running. Mirrors analyzer/events.py; both are checked
 // against ./sample/events.sample.json.
 
-export const EVENT_KINDS = ['scan_started', 'check_done', 'screenshot_ready', 'verdict', 'reply_sent', 'scan_failed'] as const
+export const EVENT_KINDS = [
+  'scan_started', 'check_done', 'screenshot_ready', 'verdict', 'reply_sent', 'guardian_alerted', 'scan_failed',
+] as const
 export type EventKind = (typeof EVENT_KINDS)[number]
 
 /** Whether a finished check found something, found nothing, or could not look. */
@@ -24,6 +26,7 @@ export interface ScanEvent {
 //   screenshot_ready  { screenshot_url }          fetch it from the same host
 //   verdict           { verdict, score, headline, explained_by, report_path }
 //   reply_sent        { delivered }
+//   guardian_alerted  { guardian }                family mode told a guardian (a mask, like sender)
 //   scan_failed       { detail }
 
 export class EventError extends Error {}

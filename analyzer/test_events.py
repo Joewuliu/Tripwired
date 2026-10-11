@@ -277,3 +277,15 @@ def test_an_unread_page_is_not_reported_free_of_forms_or_warnings(client, fresh_
     outcome = {e.data["check"]: e.data["outcome"] for e in fresh_bus.recent() if e.kind == "check_done"}
     assert outcome["page_opened"] == outcome["sensitive_form"] == outcome["platform_warning"] == "unavailable"
     assert "screenshot_ready" not in [e.kind for e in fresh_bus.recent()]
+
+
+def test_a_guardian_alert_is_shown_with_both_people_masked_and_no_hash(client, fresh_bus):  # noqa: F811
+    guardian = {"hash": "c4d81e02a97b6f35", "last4": "8820"}
+    response = client.post("/internal/guardian-alerted", json={"scan": "abc123abc123", "sender": SENDER, "guardian": guardian})
+    assert response.status_code == 204
+    event = fresh_bus.recent()[-1]
+    assert (event.kind, event.scan, event.sender, event.data) == ("guardian_alerted", "abc123abc123", "•••-4412", {"guardian": "•••-8820"})
+    text = frame(event)
+    assert HASH not in text and guardian["hash"] not in text and '"last4"' not in text
+    for bad in ({"scan": "abc123abc123"}, {"scan": "abc123abc123", "guardian": {"hash": "+19195554412"}}, {"scan": "nope", "guardian": guardian}):
+        assert client.post("/internal/guardian-alerted", json=bad).status_code == 422

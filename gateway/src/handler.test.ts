@@ -41,14 +41,17 @@ function recorder(): { out: Outbox; sent: string[] } {
 
 function fakeAnalyzer(
   overrides: Partial<Analyzer> = {},
-): Analyzer & { asked: string[]; senders: unknown[]; replies: unknown[] } {
+): Analyzer & { asked: string[]; senders: unknown[]; replies: unknown[]; alerts: unknown[] } {
   const asked: string[] = [];
   const senders: unknown[] = [];
   const replies: unknown[] = [];
+  const alerts: unknown[] = [];
   return {
     asked,
     senders,
     replies,
+    alerts,
+    guardianAlerted: async (scan, guardian, sender) => void alerts.push({ scan, guardian, sender }),
     analyze: async (url, sender) => {
       asked.push(url);
       senders.push(sender);

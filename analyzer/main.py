@@ -196,6 +196,22 @@ async def reply_sent(body: ReplySent) -> None:
     bus.publish(body.scan, "reply_sent", {"delivered": True}, sender)
 
 
+class GuardianAlerted(BaseModel):
+    scan: str = Field(pattern=r"^[a-f0-9]{12}$")
+    guardian: SenderRef
+    sender: SenderRef | None = None
+
+
+@app.post("/internal/guardian-alerted", status_code=204)
+async def guardian_alerted(body: GuardianAlerted) -> None:
+    """Internal (private network only; Caddy answers 404): family mode told a guardian about this
+    scan's Dangerous verdict. The stream shows the guardian as a mask, like every sender."""
+    sender = sender_from(body.sender.model_dump()) if body.sender else None
+    guardian = sender_from(body.guardian.model_dump())
+    if guardian is not None:
+        bus.publish(body.scan, "guardian_alerted", {"guardian": guardian.mask}, sender)
+
+
 def _last_event_id(request: Request) -> int | None:
     raw = request.headers.get("last-event-id") or request.query_params.get("since") or ""
     return int(raw) if raw.isdigit() else None

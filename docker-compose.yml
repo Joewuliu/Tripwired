@@ -49,6 +49,9 @@ services:
       # checks an hour each sender gets.
       SENDER_SALT: ${SENDER_SALT:-}
       TRIPWIRE_CHECKS_PER_HOUR: ${TRIPWIRE_CHECKS_PER_HOUR:-10}
+    volumes:
+      # Family links (who alerts whom). The one place a phone number is kept; nothing else mounts it.
+      - gateway_data:/app/data
     depends_on:
       analyzer:
         condition: service_healthy
@@ -83,6 +86,7 @@ services:
         ipv4_address: 172.30.0.12
 
 volumes:
+  gateway_data:
   caddy_data:
   caddy_config:
 

@@ -32,6 +32,7 @@ export interface ScanView {
   reportPath: string | null
   explainedBy: 'gemini' | 'template' | null
   replied: boolean
+  guardians: string[] // masks of the guardians family mode alerted about this scan
   failed: boolean
   startedAt: number | null // ms, from the event's own time
   lane: number // 0..MAX_VISIBLE-1: where across the sky the bubble sits
@@ -65,7 +66,7 @@ function reportPath(value: unknown): string | null {
 function newScan(event: ScanEvent, lane: number): ScanView {
   return {
     id: event.scan, url: null, source: null, sender: event.sender, checks: [], screenshotUrl: null, verdict: null,
-    score: null, headline: null, reportPath: null, explainedBy: null, replied: false, failed: false, startedAt: null,
+    score: null, headline: null, reportPath: null, explainedBy: null, replied: false, guardians: [], failed: false, startedAt: null,
     lane, leaving: false, lastEventId: event.id,
   }
 }
@@ -128,6 +129,11 @@ function apply(scan: ScanView, event: ScanEvent): ScanView {
     }
     case 'reply_sent':
       return { ...next, replied: true }
+    case 'guardian_alerted': {
+      const guardian = typeof data.guardian === 'string' && /^•••(-[0-9]{4})?$/.test(data.guardian) ? data.guardian : null
+      if (!guardian || scan.guardians.includes(guardian)) return next
+      return { ...next, guardians: [...scan.guardians, guardian] }
+    }
     case 'scan_failed':
       return { ...next, failed: true }
   }

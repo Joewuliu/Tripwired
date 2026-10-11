@@ -12,6 +12,8 @@ import {
   formatReply,
   rateLimited,
 } from "./reply";
+import { parseCommand } from "./commands";
+import type { Family, Person } from "./family";
 import { type SenderId, redact } from "./sender";
 import { extractUrls } from "./urls";
 
@@ -38,6 +40,12 @@ export interface Policy {
   label: string;
   limit: number;
   take(): number | null;
+}
+
+/** Family mode for this message: the service, and the person the message came from. */
+export interface FamilyContext {
+  service: Family;
+  me: Person;
 }
 
 /** The only two things the gateway ever sends. */
@@ -95,6 +103,7 @@ async function scanAndReply(
   opening: string,
   who: string,
   sender?: SenderId,
+  family?: FamilyContext,
 ): Promise<void> {
   console.log(`checking ${defangText(urls[0])} for ${who}`);
   await out.sendText(opening);
@@ -108,7 +117,25 @@ async function scanAndReply(
   if (result.screenshot_url) await sendScreenshot(result.screenshot_url, out, analyzer);
   await out.sendText(formatReply(result, publicUrl));
   await analyzer.replySent(result.id, sender);
+  if (family) await alertGuardians(family, result, analyzer, publicUrl);
   if (urls.length > 1) await out.sendText(ONE_AT_A_TIME);
+}
+
+/** A Dangerous verdict, and only that, reaches the person's guardians. It never holds up or changes the reply. */
+async function alertGuardians(
+  family: FamilyContext,
+  result: Awaited<ReturnType<Analyzer["analyze"]>>,
+  analyzer: Analyzer,
+  publicUrl: string | undefined,
+): Promise<void> {
+  try {
+    const sender = { hash: family.me.hash, last4: family.me.last4 };
+    for (const guardian of await family.service.alertGuardians(sender, result, publicUrl)) {
+      await analyzer.guardianAlerted(result.id, guardian, sender);
+    }
+  } catch (error) {
+    logFailure("guardian alert failed", error);
+  }
 }
 
 async function handlePictures(
@@ -118,6 +145,7 @@ async function handlePictures(
   publicUrl: string | undefined,
   who: string,
   sender?: SenderId,
+  family?: FamilyContext,
 ): Promise<void> {
   if (pictures.length === 0) return out.sendText(PICTURE_UNAVAILABLE);
   await out.sendText(READING_PICTURE);
@@ -131,7 +159,7 @@ async function handlePictures(
   if (found.status === "unavailable") return out.sendText(PICTURE_UNAVAILABLE);
   if (found.status === "none") return out.sendText(NO_LINK_IN_PICTURE);
   // The link is scanned like any typed link: the picture can only get it looked at.
-  return scanAndReply(found.urls, out, analyzer, publicUrl, foundInPicture(found.urls[0]), who, sender);
+  return scanAndReply(found.urls, out, analyzer, publicUrl, foundInPicture(found.urls[0]), who, sender, family);
 }
 
 /** One forwarded message: acknowledgment, then the screenshot, then the verdict. */
@@ -141,8 +169,13 @@ export async function handleInbound(
   analyzer: Analyzer = createAnalyzer(),
   publicUrl: string | undefined = process.env.PUBLIC_URL,
   policy?: Policy,
+  family?: FamilyContext,
 ): Promise<void> {
   if (inbound.kind === "ignore") return;
+  // A message that is exactly a family command (protect, YES, STOP...) is handled as one. It is
+  // not a check, so it is not counted against the hourly limit.
+  const command = family && inbound.kind === "text" ? parseCommand(inbound.text) : null;
+  if (family && command) return family.service.command(family.me, command, (text) => out.sendText(text));
   const who = policy?.label ?? "unknown sender";
 
   /** A check costs a scan or a picture read, so it is counted before any work or acknowledgment. */
@@ -156,17 +189,17 @@ export async function handleInbound(
 
   if (inbound.kind === "image") {
     if (!(await allowed())) return;
-    return handlePictures(inbound.pictures ?? [], out, analyzer, publicUrl, who, policy?.sender);
+    return handlePictures(inbound.pictures ?? [], out, analyzer, publicUrl, who, policy?.sender, family);
   }
 
   const urls = extractUrls(inbound.text);
   if (urls.length > 0) {
     if (!(await allowed())) return;
-    return scanAndReply(urls, out, analyzer, publicUrl, OPENING, who, policy?.sender);
+    return scanAndReply(urls, out, analyzer, publicUrl, OPENING, who, policy?.sender, family);
   }
   if (inbound.hasImage) {
     if (!(await allowed())) return;
-    return handlePictures(inbound.pictures ?? [], out, analyzer, publicUrl, who, policy?.sender);
+    return handlePictures(inbound.pictures ?? [], out, analyzer, publicUrl, who, policy?.sender, family);
   }
   return out.sendText(NO_URL);
 }

@@ -17,7 +17,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import AsyncIterator
 
-KINDS = ("scan_started", "check_done", "screenshot_ready", "verdict", "reply_sent", "scan_failed")
+KINDS = ("scan_started", "check_done", "screenshot_ready", "verdict", "reply_sent", "guardian_alerted", "scan_failed")
 
 BACKLOG = 300
 REPLAY_ON_CONNECT = 60  # what a fresh connection is given, newest last

@@ -174,3 +174,17 @@ test('removed ids are remembered in the browser, and junk there is ignored', () 
   assert.deepEqual(loadHidden(null), [])
   saveHidden(['5a3c0de1f2b4'], null) // must not throw
 })
+
+test('a guardian alert is kept as a mask, once, and anything that is not a mask is ignored', () => {
+  const toll = play(recording).scans[0]
+  assert.deepEqual(toll.guardians, ['•••-8820'])
+  const id = scanId(7)
+  const state = play([
+    started(7),
+    event(id, 'guardian_alerted', { guardian: '•••-4412' }),
+    event(id, 'guardian_alerted', { guardian: '•••-4412' }),
+    event(id, 'guardian_alerted', { guardian: '+19195554412' }),
+    event(id, 'guardian_alerted', { guardian: 7 }),
+  ])
+  assert.deepEqual(state.scans[0].guardians, ['•••-4412'])
+})

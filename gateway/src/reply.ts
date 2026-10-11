@@ -1,7 +1,9 @@
 import * as linkify from "linkifyjs";
 
 export const OPENING = "Opening that in a sandbox. About 20 seconds.";
-export const NO_URL = "Forward me a suspicious text or link and I'll open it in a sandbox for you.";
+export const NO_URL =
+  "Forward me a suspicious text or link and I'll open it in a sandbox for you. " +
+  "To get an alert when someone you care about is sent a dangerous link, text: protect and their mobile number.";
 export const PICTURE_UNAVAILABLE = "I can't read pictures right now. Paste the link itself and I'll check it.";
 export const READING_PICTURE = "Looking for a link in your picture. A few seconds.";
 export const NO_LINK_IN_PICTURE =

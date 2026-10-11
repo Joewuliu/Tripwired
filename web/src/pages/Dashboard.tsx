@@ -193,6 +193,11 @@ function ReportSummary({ scan, replaying, onRemove }: { scan: ScanView | null; r
           </p>
         )}
         <ReplyLine scan={scan} />
+        {scan.guardians.map((guardian) => (
+          <p key={guardian} className="reply-line sent">
+            Guardian {guardian} alerted
+          </p>
+        ))}
         <button type="button" className="button small remove" onClick={() => onRemove(scan)}>
           <TrashIcon /> Remove from this dashboard
         </button>

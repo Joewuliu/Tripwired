@@ -17,6 +17,8 @@ export interface Analyzer {
   analyze(url: string, sender?: SenderId): Promise<AnalysisResult>;
   /** Tell the analyzer the reply went out, so the live stream can show it. Never throws. */
   replySent(scanId: string, sender?: SenderId): Promise<void>;
+  /** Tell the analyzer a guardian was alerted about this scan (masked on the live stream). Never throws. */
+  guardianAlerted(scanId: string, guardian: SenderId, sender?: SenderId): Promise<void>;
   readImage(bytes: Buffer, mimeType: string): Promise<PictureReading>;
   fetchScreenshot(path: string): Promise<Buffer>;
 }
@@ -98,6 +100,19 @@ export function createAnalyzer(base = process.env.ANALYZER_URL || DEFAULT_BASE):
         });
       } catch {
         // the event stream is a view, not part of the reply: losing one event costs nothing
+      }
+    },
+
+    async guardianAlerted(scanId, guardian, sender) {
+      try {
+        await fetch(new URL("/internal/guardian-alerted", base), {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ scan: scanId, guardian, ...(sender ? { sender } : {}) }),
+          signal: AbortSignal.timeout(5_000),
+        });
+      } catch {
+        // as with replySent: the stream is a view, and the alert itself has already gone out
       }
     },
 
