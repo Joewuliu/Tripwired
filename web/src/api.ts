@@ -18,10 +18,10 @@ export async function fetchReport(id: string, doFetch: Fetcher = fetch, signal?:
   try {
     response = await doFetch(`/api/report/${id}`, { signal, headers: { Accept: 'application/json' } })
   } catch {
-    return { kind: 'error', message: "We couldn't reach Tripwire." }
+    return { kind: 'error', message: "We couldn't reach Phish Finder." }
   }
   if (response.status === 404) return { kind: 'missing' }
-  if (!response.ok) return { kind: 'error', message: `Tripwire answered with an error (${response.status}).` }
+  if (!response.ok) return { kind: 'error', message: `Phish Finder answered with an error (${response.status}).` }
   try {
     return { kind: 'ok', report: parseReport(await response.json()) }
   } catch (error) {

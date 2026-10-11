@@ -1,4 +1,4 @@
-# Deploying Tripwire to a Debian VM on Google Cloud
+# Deploying Phish Finder to a Debian VM on Google Cloud
 
 Three containers run with Docker Compose:
 
@@ -14,7 +14,7 @@ deployment, start at step 0.
 Commands marked **laptop** run in Windows PowerShell; commands marked **VM** run over SSH.
 Replace `VM_NAME` and `ZONE` with yours.
 
-## 0. Clear any previous deployment (VM; skip if this VM has never run Tripwire)
+## 0. Clear any previous deployment (VM; skip if this VM has never run Phish Finder)
 
 A previous deployment on the same VM collides with this one in four ways: its Docker network is
 also called `tripwire` and uses the same subnet (172.30.0.0/24), its firewall rules name that
@@ -34,7 +34,7 @@ sudo ss -ltnp | grep -E ':(80|443)\b' || true
 ```
 
 Note the folder in the `CONFIG FILES` column of `docker compose ls -a`: that is the old stack's
-folder. Anything else you do not recognise in these lists is not Tripwire's: leave it alone.
+folder. Anything else you do not recognise in these lists is not Phish Finder's: leave it alone.
 
 ### 0b. Shut the old stack down
 
@@ -119,7 +119,7 @@ the folder once the new stack works: `rm -rf ~/tripwire-previous`.
 
 | Check | Expected |
 | --- | --- |
-| `docker ps -a` | no Tripwire containers |
+| `docker ps -a` | no Phish Finder containers |
 | `docker network ls` | no network named `tripwire` |
 | `sudo iptables -S DOCKER-USER` | only `-N DOCKER-USER` and `-A DOCKER-USER -j RETURN` |
 | `sudo iptables -S INPUT \| grep -E '172\.30\.0\.\|tripwire'` | nothing |
@@ -399,7 +399,7 @@ Expected: a file size, then `404` (the analyze endpoint is not on the internet).
 `https://example.com`. Close the laptop: it must still answer.
 
 **The report link.** The reply ends with `Full report: https://<your-host>.sslip.io/r/<id>`.
-It is the one tappable link Tripwire sends: everything about the scanned page is defanged. Tap it
+It is the one tappable link Phish Finder sends: everything about the scanned page is defanged. Tap it
 and the report page opens: verdict, what to do, the screenshot, and the evidence. The page reads
 the scan as JSON from the same host; you can read that directly too:
 
@@ -506,7 +506,7 @@ nothing moving or flashing.
 
 ## Family mode
 
-A guardian texts the line `protect +1 919 555 0142`. Tripwire texts that number an invite naming
+A guardian texts the line `protect +1 919 555 0142`. Phish Finder texts that number an invite naming
 the guardian only as `•••-<last four>`; nothing is linked until that person replies `YES` (within
 24 hours). From then on, when the protected person forwards a link and the verdict is Dangerous,
 and only then, each guardian gets one short alert: the site's name (defanged), our report link, and
@@ -554,7 +554,7 @@ site only through a rebuild, which the script does every time.
 If `deploy/egress-firewall.sh` or the network section of `docker-compose.yml` changed, also run
 `sudo bash deploy/egress-firewall.sh`. If only `.env` changed, `docker compose up -d` is enough.
 
-## Check Tripwire against live scams (VM only)
+## Check Phish Finder against live scams (VM only)
 
 `analyzer/live_check.py` takes fresh phishing links from OpenPhish and known-good links from
 `analyzer/data/benign.txt`, runs each through the real pipeline, and prints a defanged table. It
@@ -582,7 +582,7 @@ docker compose exec analyzer python live_check.py --phish 5 --benign 5
 How to read it:
 
 - Each link shows its verdict with every signal, and again with the threat-feed hits removed. The
-  links come from OpenPhish and Tripwire also asks OpenPhish, so the first column is flattering: the
+  links come from OpenPhish and Phish Finder also asks OpenPhish, so the first column is flattering: the
   **"feeds removed" column is the honest measure** of the page and domain signals.
 - Many phishing links are already dead by the time they are opened. A dead page is "couldn't check"
   (or "dangerous" if a feed still lists it). That is correct, not a miss. If most of the five are dead,
@@ -608,7 +608,7 @@ with the same `--seed` compare directly. A single scan from a phone has the VM t
 this far less than the check does.
 
 To forward live scams from your phone instead, print five fresh links (they are **not** defanged:
-paste them into the Tripwire chat, never open them):
+paste them into the Phish Finder chat, never open them):
 
 ```bash
 docker compose exec analyzer python live_check.py --list 5

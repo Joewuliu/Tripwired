@@ -17,7 +17,7 @@ export function rateLimited(limit: number, waitMs: number): string {
   const minutes = Math.max(1, Math.ceil(waitMs / 60_000));
   return (
     `You've used your ${limit} checks for this hour. I can check another link in about ` +
-    `${minutes} minute${minutes === 1 ? "" : "s"}. The limit keeps Tripwire available for everyone. ` +
+    `${minutes} minute${minutes === 1 ? "" : "s"}. The limit keeps Phish Finder available for everyone. ` +
     "Until then, don't tap the link or enter anything on it."
   );
 }
@@ -112,7 +112,7 @@ export function formatReply(result: AnalysisResult, publicUrl?: string): string 
   const opened = verdict !== "couldnt_check" && result.loaded;
   const link = opened ? result.final_url_defanged : result.url_defanged;
   const lines = [
-    `Tripwire: ${LABELS[verdict]}`,
+    `Phish Finder: ${LABELS[verdict]}`,
     headline,
     ...bullets,
     ACTIONS[verdict],

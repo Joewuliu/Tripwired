@@ -141,7 +141,7 @@ test("STOP to an invite declines it and starts the same wait", async () => {
 test("STOP from the protected person unlinks at once and tells the guardian", async () => {
   const w = await linked();
   assert.match(await w.say(GRANDMA, "stop"), /nobody gets alerts about your links/);
-  assert.deepEqual(w.to(YOU), ["Tripwire: •••-0142 turned off alerts. You're no longer linked."]);
+  assert.deepEqual(w.to(YOU), ["Phish Finder: •••-0142 turned off alerts. You're no longer linked."]);
   assert.deepEqual(await w.family.alertGuardians(hasher.identify(GRANDMA), DANGEROUS, HOST), []);
   assert.match(await w.say(YOU, "protect +1 919 555 0142"), /can't ask them again/); // and cannot be re-invited for a day
 });
@@ -149,7 +149,7 @@ test("STOP from the protected person unlinks at once and tells the guardian", as
 test("unprotect from the guardian unlinks and tells the protected person", async () => {
   const w = await linked();
   assert.match(await w.say(YOU, "unprotect +1 919 555 0142"), /no longer get alerts for •••-0142/);
-  assert.deepEqual(w.to(GRANDMA), ["Tripwire: •••-4412 will no longer get alerts about your links."]);
+  assert.deepEqual(w.to(GRANDMA), ["Phish Finder: •••-4412 will no longer get alerts about your links."]);
   assert.deepEqual(await w.family.alertGuardians(hasher.identify(GRANDMA), DANGEROUS, HOST), []);
   assert.match(await w.say(YOU, "unprotect +1 919 555 0142"), /aren't getting alerts/);
 });
@@ -341,7 +341,7 @@ test("a forwarded dangerous link: the person gets their verdict, the guardian an
   const { out, sent } = recorder();
   const me = person(GRANDMA);
   await handleInbound({ kind: "text", text: "is this real? https://short.example/x" }, out, analyzer, HOST, undefined, { service: w.family, me });
-  assert.ok(sent.at(-1)!.startsWith("Tripwire: DANGEROUS"));
+  assert.ok(sent.at(-1)!.startsWith("Phish Finder: DANGEROUS"));
   assert.equal(w.to(YOU).length, 1);
   assert.ok(!w.to(YOU)[0].includes("is this real")); // never the person's own words
   assert.deepEqual(analyzer.alerts, [{ scan: "abc123abc123", guardian: hasher.identify(YOU), sender: hasher.identify(GRANDMA) }]);

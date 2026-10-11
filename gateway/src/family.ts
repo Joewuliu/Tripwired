@@ -157,7 +157,7 @@ export class Family {
     this.data.inviteTimes[me.hash] = [...sent, this.now()];
     const delivered = await this.tell(
       them.hash,
-      `Tripwire: someone at ${mask(me)} asked to get an alert when you're sent a dangerous link. ` +
+      `Phish Finder: someone at ${mask(me)} asked to get an alert when you're sent a dangerous link. ` +
         "Reply YES to agree, or ignore this message. Nothing is shared unless you reply YES. " +
         "They would see only the site's name and our report, never your messages.",
     );
@@ -186,7 +186,7 @@ export class Family {
     if (linked.length === 0) return reply(`You already have ${MAX_GUARDIANS} people getting alerts, which is the most allowed.`);
     for (const guardian of linked) {
       console.log(`family link: ${label(me)} agreed to ${label({ hash: guardian, last4: this.data.people[guardian]?.last4 ?? null })}`);
-      await this.tell(guardian, `Tripwire: ${mask(me)} said YES. You'll get an alert if a link they forward is rated Dangerous.`);
+      await this.tell(guardian, `Phish Finder: ${mask(me)} said YES. You'll get an alert if a link they forward is rated Dangerous.`);
     }
     const who = linked.map((g) => this.maskOf(g)).join(" and ");
     return reply(
@@ -206,8 +206,8 @@ export class Family {
       return reply("You have no family links, so there's nothing to stop.");
     }
     // Messages go out before the addresses are dropped by the save.
-    for (const link of asProtected) await this.tell(link.guardian, `Tripwire: ${mask(me)} turned off alerts. You're no longer linked.`);
-    for (const link of asGuardian) await this.tell(link.protected, `Tripwire: ${mask(me)} will no longer get alerts about your links.`);
+    for (const link of asProtected) await this.tell(link.guardian, `Phish Finder: ${mask(me)} turned off alerts. You're no longer linked.`);
+    for (const link of asGuardian) await this.tell(link.protected, `Phish Finder: ${mask(me)} will no longer get alerts about your links.`);
     this.data.links = this.data.links.filter((l) => l.protected !== me.hash && l.guardian !== me.hash);
     this.data.invites = this.data.invites.filter((i) => i.protected !== me.hash && i.guardian !== me.hash);
     for (const pair of [...asProtected, ...declined]) {
@@ -224,7 +224,7 @@ export class Family {
     const linked = this.data.links.some((l) => same(l, pair));
     const invited = this.data.invites.some((i) => same(i, pair));
     if (!linked && !invited) return reply(`You aren't getting alerts for ${mask(them)}.`);
-    if (linked) await this.tell(them.hash, `Tripwire: ${mask(me)} will no longer get alerts about your links.`);
+    if (linked) await this.tell(them.hash, `Phish Finder: ${mask(me)} will no longer get alerts about your links.`);
     this.data.links = this.data.links.filter((l) => !same(l, pair));
     this.data.invites = this.data.invites.filter((i) => !same(i, pair));
     this.save();

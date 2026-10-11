@@ -73,7 +73,7 @@ test("acknowledgment first, then the screenshot, then the verdict", async () => 
   assert.equal(sent.length, 3);
   assert.equal(sent[0], `text:${OPENING}`);
   assert.equal(sent[1], "image:abc123abc123.png:image/png:4");
-  assert.ok(sent[2].startsWith("text:Tripwire: NO RED FLAGS"));
+  assert.ok(sent[2].startsWith("text:Phish Finder: NO RED FLAGS"));
   assert.ok(!sent[2].includes("https://"));
 });
 
@@ -117,7 +117,7 @@ test("a picture with a link in it: the link is read, shown defanged, then scanne
   assert.equal(sent[0], `text:${READING_PICTURE}`);
   assert.equal(sent[1], `text:${foundInPicture("https://usps-track.top/x")}`);
   assert.ok(!sent[1].includes("https://"));
-  assert.ok(sent.at(-1)!.startsWith("text:Tripwire:"));
+  assert.ok(sent.at(-1)!.startsWith("text:Phish Finder:"));
 });
 
 test("a QR photo sent with words but no link is read too", async () => {
@@ -216,7 +216,7 @@ test("a screenshot that cannot be fetched does not stop the verdict", async () =
   });
   await handleInbound({ kind: "text", text: "https://example.com" }, out, analyzer);
   assert.equal(sent.length, 2);
-  assert.ok(sent[1].startsWith("text:Tripwire:"));
+  assert.ok(sent[1].startsWith("text:Phish Finder:"));
 });
 
 test("no screenshot to send when the analyzer has none", async () => {
@@ -257,7 +257,7 @@ test("the eleventh check in an hour gets the friendly reply and no scan", async 
   assert.equal(sent.length, 1);
   assert.match(sent[0], /^text:You.ve used your 10 checks for this hour./);
   assert.match(sent[0], /about \d+ minutes?/);
-  assert.ok(!/safe/i.test(sent[0].replace("Tripwire", "")));
+  assert.ok(!/safe/i.test(sent[0].replace("Phish Finder", "")));
 });
 
 test("pictures count too, and so does the second sender separately", async () => {

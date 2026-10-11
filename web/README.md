@@ -1,4 +1,4 @@
-# Tripwire web
+# Phish Finder web
 
 React + TypeScript + Vite. The report page (`/r/<id>`), and later the verdict card, the live dashboard and
 the paste-a-link box.

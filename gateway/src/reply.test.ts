@@ -29,7 +29,7 @@ test("defangText leaves ordinary sentences and already-defanged links alone", ()
 test("a dangerous reply has a label, headline, up to three bullets, an action and the link", () => {
   const reply = formatReply(result());
   const lines = reply.split("\n");
-  assert.equal(lines[0], "Tripwire: DANGEROUS");
+  assert.equal(lines[0], "Phish Finder: DANGEROUS");
   assert.equal(lines[1], "Dangerous: Listed as phishing by OpenPhish");
   assert.ok(!reply.includes("- Listed as phishing by OpenPhish"), "headline's reason is not repeated");
   assert.ok(reply.includes("- Registered 2 days ago, from RDAP"));
@@ -49,7 +49,7 @@ test("a link that did not load says 'Link we tried' and shows the original addre
   const reply = formatReply(
     result({ verdict: "couldnt_check", loaded: false, final_url_defanged: null, observations: [] }),
   );
-  assert.ok(reply.includes("Tripwire: COULDN'T CHECK"));
+  assert.ok(reply.includes("Phish Finder: COULDN'T CHECK"));
   assert.ok(reply.endsWith("Link we tried: hxxps://short[.]example/x"));
 });
 
@@ -86,10 +86,10 @@ const REAL: Record<string, Partial<AnalysisResult>> = {
   },
 };
 const LABEL: Record<string, string> = {
-  dangerous: "Tripwire: DANGEROUS",
-  suspicious: "Tripwire: SUSPICIOUS",
-  no_red_flags: "Tripwire: NO RED FLAGS",
-  couldnt_check: "Tripwire: COULDN'T CHECK",
+  dangerous: "Phish Finder: DANGEROUS",
+  suspicious: "Phish Finder: SUSPICIOUS",
+  no_red_flags: "Phish Finder: NO RED FLAGS",
+  couldnt_check: "Phish Finder: COULDN'T CHECK",
 };
 
 for (const [verdict, fields] of Object.entries(REAL)) {

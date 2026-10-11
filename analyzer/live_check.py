@@ -140,12 +140,12 @@ async def run(phish: list[str], benign: list[str], shots: Path) -> list[dict]:
 
 
 def parse_args(argv: list[str] | None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run live phishing links and known-good links through Tripwire.")
+    parser = argparse.ArgumentParser(description="Run live phishing links and known-good links through Phish Finder.")
     parser.add_argument("--phish", type=int, default=5, help="phishing links to take from OpenPhish")
     parser.add_argument("--benign", type=int, default=5, help="known-good links to take from data/benign.txt")
     parser.add_argument("--seed", type=int, default=None, help="repeat the same sample")
     parser.add_argument("--list", type=int, default=0, metavar="N",
-                        help="only print N fresh phishing links (NOT defanged: paste into the Tripwire chat, never open)")
+                        help="only print N fresh phishing links (NOT defanged: paste into the Phish Finder chat, never open)")
     args = parser.parse_args(argv)
     if args.seed is None:
         args.seed = random.SystemRandom().randrange(2**32)
@@ -161,7 +161,7 @@ async def _main(args: argparse.Namespace) -> None:
     rng = random.Random(args.seed)
 
     if args.list:
-        print("LIVE PHISHING LINKS. Do not open them. Forward them to the Tripwire number.\n")
+        print("LIVE PHISHING LINKS. Do not open them. Forward them to the Phish Finder number.\n")
         print("\n".join(sample(pool, args.list, rng)))
         return
 

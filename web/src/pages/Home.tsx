@@ -11,7 +11,7 @@ export function Home() {
       <section className="glass">
         <h1>Forward a suspicious text. Get a screenshot and a verdict.</h1>
         <p className="lead">
-          Tripwire opens the link in a sandbox so you don&apos;t have to, collects evidence, and texts back what it
+          Phish Finder opens the link in a sandbox so you don&apos;t have to, collects evidence, and texts back what it
           found in about 20 seconds.
         </p>
         <p>

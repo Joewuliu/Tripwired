@@ -133,9 +133,9 @@ export function ReportPage({ id }: { id: string }) {
     <main className="page">
       <Brand />
       <header className={`glass report-header verdict-${report.verdict}`}>
-        <p className="eyebrow">Tripwire report</p>
+        <p className="eyebrow">Phish Finder report</p>
         {id === 'sample' && (
-          <p className="notice">Example report. The page is made up; the findings and points are what Tripwire&apos;s scorer produces for it.</p>
+          <p className="notice">Example report. The page is made up; the findings and points are what Phish Finder&apos;s scorer produces for it.</p>
         )}
         <p className={`badge badge-${report.verdict}`}>{VERDICT_LABEL[report.verdict]}</p>
         <h1>{report.headline}</h1>
@@ -223,7 +223,7 @@ export function ReportPage({ id }: { id: string }) {
 
       <section className="glass">
         <h2>How the score is worked out</h2>
-        <p>This is the whole table Tripwire uses. The rows in bold are the ones that applied to this scan.</p>
+        <p>This is the whole table Phish Finder uses. The rows in bold are the ones that applied to this scan.</p>
         <div className="table-wrap">
           <table>
             <thead>
